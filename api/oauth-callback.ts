@@ -11,8 +11,8 @@ function getCookie(req: VercelRequest, name: string) {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_REDIRECT_URI, DB_HOST, DB_USER, DB_PASSWORD, DB_NAME } = process.env as Record<string, string | undefined>;
-    if (!AUTH0_DOMAIN || !AUTH0_CLIENT_ID || !AUTH0_CLIENT_SECRET || !AUTH0_REDIRECT_URI) {
-      return res.status(500).send('Missing Auth0 env');
+    if (!AUTH0_DOMAIN || !AUTH0_CLIENT_ID || !AUTH0_REDIRECT_URI) {
+      return res.status(500).send('Missing Auth0 env (DOMAIN/CLIENT_ID/REDIRECT_URI)');
     }
     if (!DB_HOST || !DB_USER || !DB_PASSWORD || !DB_NAME) {
       return res.status(500).send('Missing DB env');
@@ -32,7 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         client_id: AUTH0_CLIENT_ID,
-        client_secret: AUTH0_CLIENT_SECRET,
+        // client_secret omitted for SPA/public clients
         code: String(code),
         code_verifier: verifier,
         redirect_uri: AUTH0_REDIRECT_URI,
@@ -77,4 +77,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(500).send(e?.message || String(e));
   }
 }
-
