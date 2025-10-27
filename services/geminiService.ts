@@ -3,18 +3,22 @@ import { GoogleGenAI, Chat } from '@google/genai';
 import type { GroundingSource } from '../types';
 
 class GeminiService {
-  private ai: GoogleGenAI;
+  private ai: GoogleGenAI | null = null;
   private chat: Chat | null = null;
 
   constructor() {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      throw new Error("API_KEY environment variable not set");
+    const apiKey = (import.meta as any)?.env?.VITE_API_KEY || (process as any)?.env?.API_KEY;
+    if (apiKey) {
+      this.ai = new GoogleGenAI({ apiKey });
+    } else {
+      // Sem API key: mantemos a UI funcionando e desabilitamos o chat.
+      this.ai = null;
+      console.warn('VITE_API_KEY/API_KEY not set. Gemini features are disabled.');
     }
-    this.ai = new GoogleGenAI({ apiKey });
   }
 
   private initializeChat() {
+    if (!this.ai) return;
     this.chat = this.ai.chats.create({
       model: 'gemini-2.5-flash',
       config: {
@@ -29,6 +33,9 @@ class GeminiService {
   }
 
   public async sendChatMessage(message: string): Promise<{ text: string, sources: GroundingSource[] }> {
+    if (!this.ai) {
+      return { text: 'Assistente desabilitado (sem API).', sources: [] };
+    }
     if (!this.chat) {
       this.initializeChat();
     }

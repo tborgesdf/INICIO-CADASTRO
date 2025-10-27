@@ -70,7 +70,8 @@ const PersonalInfoScreen: React.FC<PersonalInfoScreenProps> = ({ onNext, userDat
   const audioContextRef = useRef<AudioContext | null>(null);
   const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
   
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  const apiKey = (import.meta as any)?.env?.VITE_API_KEY || (process as any)?.env?.API_KEY;
+  const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
   const validateField = (name: keyof typeof formData, value: string) => {
     let error = '';
@@ -130,6 +131,7 @@ const PersonalInfoScreen: React.FC<PersonalInfoScreenProps> = ({ onNext, userDat
       mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       
+      if (!ai) throw new Error('AI desabilitado (sem API key).');
       sessionPromiseRef.current = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         callbacks: {
