@@ -7,7 +7,7 @@ class GeminiService {
   private chat: Chat | null = null;
 
   constructor() {
-    const apiKey = (import.meta as any)?.env?.VITE_API_KEY || (process as any)?.env?.API_KEY;
+    const apiKey = (import.meta as any)?.env?.VITE_API_KEY || (typeof process !== 'undefined' ? (process as any)?.env?.API_KEY : undefined);
     if (apiKey) {
       this.ai = new GoogleGenAI({ apiKey });
     } else {

@@ -70,7 +70,7 @@ const PersonalInfoScreen: React.FC<PersonalInfoScreenProps> = ({ onNext, userDat
   const audioContextRef = useRef<AudioContext | null>(null);
   const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
   
-  const apiKey = (import.meta as any)?.env?.VITE_API_KEY || (process as any)?.env?.API_KEY;
+  const apiKey = (import.meta as any)?.env?.VITE_API_KEY || (typeof process !== 'undefined' ? (process as any)?.env?.API_KEY : undefined);
   const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
   const validateField = (name: keyof typeof formData, value: string) => {
