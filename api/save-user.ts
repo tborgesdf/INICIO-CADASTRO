@@ -1,6 +1,26 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mysql from 'mysql2/promise';
-import { verifyFromRequest } from '../lib/auth';
+
+const COOKIE_NAME = 'auth_token';
+function parseCookie(req: any): string | null {
+  const cookie = req.headers.cookie || '';
+  const m = cookie.split(';').map((s: string) => s.trim()).find((s: string) => s.startsWith(`${COOKIE_NAME}=`));
+  return m ? decodeURIComponent(m.split('=')[1]) : null;
+}
+function verifyToken(token: string, secret: string): any | null {
+  try {
+    const [h,p,sig] = token.split('.'); if (!(h && p && sig)) return null;
+    const b2b = (s: string) => s.replace(/-/g,'+').replace(/_/g,'/');
+    const data = `${h}.${p}`;
+    const expected = require('crypto').createHmac('sha256', secret).update(data).digest('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    if (expected !== sig) return null;
+    const json = Buffer.from(b2b(p), 'base64').toString('utf8');
+    const payload = JSON.parse(json);
+    const now = Math.floor(Date.now()/1000);
+    if (payload.exp && now > payload.exp) return null;
+    return payload;
+  } catch { return null; }
+}
 
 export const config = { runtime: 'nodejs' };
 
@@ -37,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       await conn.beginTransaction();
 
-      const session = verifyFromRequest(req);
+      const session = (function(){ const tok=parseCookie(req); if(!tok) return null; const key=process.env.JWT_SECRET||'change-me-dev'; const dec=verifyToken(tok, key); return dec && dec.accountId ? { accountId: Number(dec.accountId), email: String(dec.email||'') } : null; })();
       const accountId = session?.accountId || null;
 
       const [userResult] = await conn.execute<import('mysql2').ResultSetHeader>(
@@ -92,4 +112,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Internal error', message: (e as any)?.message || String(e) });
   }
 }
+
 

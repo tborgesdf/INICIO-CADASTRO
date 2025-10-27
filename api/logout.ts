@@ -1,5 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { clearAuthCookie } from '../lib/auth';
+const COOKIE_NAME = 'auth_token';
+function clearAuthCookie(res: any) {
+  res.setHeader('Set-Cookie', `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+}
 
 export const config = { runtime: 'nodejs' };
 

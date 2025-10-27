@@ -1,7 +1,31 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mysql from 'mysql2/promise';
-import { signToken, setAuthCookie } from '../lib/auth';
 import * as crypto from 'crypto';
+
+const COOKIE_NAME = 'auth_token';
+function b64url(input: Buffer | string) {
+  const base = (typeof input === 'string' ? Buffer.from(input) : input)
+    .toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return base;
+}
+function signHS256(payload: any, secret: string) {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const now = Math.floor(Date.now()/1000);
+  const encHeader = b64url(JSON.stringify(header));
+  const encPayload = b64url(JSON.stringify({ ...payload, iat: now, exp: now + 7*24*60*60 }));
+  const data = `${encHeader}.${encPayload}`;
+  const sig = crypto.createHmac('sha256', secret).update(data).digest('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  return `${data}.${sig}`;
+}
+function signToken(payload: object, secret?: string) {
+  const key = secret || process.env.JWT_SECRET || 'change-me-dev';
+  return signHS256(payload, key);
+}
+function setAuthCookie(res: any, token: string) {
+  const isProd = process.env.NODE_ENV === 'production';
+  const cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7*24*60*60}; ${isProd ? 'Secure' : ''}`;
+  res.setHeader('Set-Cookie', cookie);
+}
 
 export const config = { runtime: 'nodejs' };
 
