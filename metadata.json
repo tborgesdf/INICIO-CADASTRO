@@ -1,0 +1,9 @@
+{
+  "name": "(INICIO CADASTRO) FEDERAL EXPRESS By DELTAFOX",
+  "description": "An application to help Federal Express clients fill out and renew visas for Canada, the United States, and Mexico. This first module collects user permissions and personal data.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation",
+    "microphone"
+  ]
+}
