@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mysql from 'mysql2/promise';
+import { verifyFromRequest } from './_auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -34,9 +35,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       await conn.beginTransaction();
 
+      const session = verifyFromRequest(req);
+      const accountId = session?.accountId || null;
+
       const [userResult] = await conn.execute<import('mysql2').ResultSetHeader>(
-        `INSERT INTO users (cpf, phone, email, latitude, longitude, visa_type) VALUES (?, ?, ?, ?, ?, ?)`,
-        [cpf, phone, email, lat, lng, visaType]
+        `INSERT INTO users (account_id, cpf, phone, email, latitude, longitude, visa_type) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [accountId, cpf, phone, email, lat, lng, visaType]
       );
 
       const userId = (userResult as any).insertId as number;

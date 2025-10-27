@@ -7,41 +7,11 @@ class AuthService {
    * Simulates logging in a user with email and password.
    * @returns A promise that resolves on "successful" login.
    */
-  public loginWithEmail(email: string, password: string): Promise<void> {
-    console.log(`--- SIMULATING EMAIL LOGIN for ${email} ---`);
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (email && password) {
-          console.log("--- LOGIN SUCCESSFUL ---");
-          resolve();
-        } else {
-          console.error("--- LOGIN FAILED: Email or password empty ---");
-          reject(new Error("Email e senha são obrigatórios."));
-        }
-      }, 1000); // 1-second delay
-    });
-  }
-
-  /**
+  public async loginWithEmail(email: string, password: string): Promise<void> {\r\n    const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });\r\n    if (!res.ok) throw new Error('Falha no login');\r\n  }\r\n\r\n  /**
    * Simulates registering a new user.
    * @returns A promise that resolves on "successful" registration.
    */
-  public registerWithEmail(name: string, email: string, password: string): Promise<void> {
-    console.log(`--- SIMULATING EMAIL REGISTRATION for ${name} (${email}) ---`);
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (name && email && password) {
-          console.log("--- REGISTRATION SUCCESSFUL ---");
-          resolve();
-        } else {
-           console.error("--- REGISTRATION FAILED: Missing fields ---");
-          reject(new Error("Todos os campos são obrigatórios."));
-        }
-      }, 1500); // 1.5-second delay
-    });
-  }
-
-  /**
+  public async registerWithEmail(name: string, email: string, password: string): Promise<void> {\r\n    const res = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password }) });\r\n    if (!res.ok) throw new Error('Falha no cadastro');\r\n  }\r\n\r\n  /**
    * Simulates logging in with a Google account.
    * @returns A promise that resolves on "successful" login.
    */
@@ -71,3 +41,4 @@ class AuthService {
 }
 
 export const authService = new AuthService();
+
