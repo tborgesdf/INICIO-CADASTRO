@@ -8,7 +8,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const body = req.body || {};
+    const raw = (req as any).body;
+    let body: any = {};
+    try {
+      body = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
+    } catch (e) {
+      return res.status(400).json({ error: 'Invalid JSON body' });
+    }
 
     const { cpf, phone, email, socialMedia, location, visaType, countries } = body;
 
@@ -63,16 +69,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       await conn.commit();
       return res.status(200).json({ ok: true, userId });
-    } catch (err) {
+    } catch (err: any) {
       await (await conn).rollback();
       console.error('DB error:', err);
-      return res.status(500).json({ error: 'Database error' });
+      return res.status(500).json({ error: 'Database error', message: err?.message || String(err) });
     } finally {
       conn.release();
     }
   } catch (e) {
     console.error('Handler error:', e);
-    return res.status(500).json({ error: 'Internal error' });
+    return res.status(500).json({ error: 'Internal error', message: (e as any)?.message || String(e) });
   }
 }
 
