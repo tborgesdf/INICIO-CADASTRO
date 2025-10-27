@@ -1,0 +1,41 @@
+name: CI-CD
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  migrate-and-deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: repo
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Run DB migrations
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+        run: npm run db:migrate
+
+      - name: Trigger Vercel Deploy (Deploy Hook)
+        if: success()
+        run: |
+          if [ -n "${{ secrets.VERCEL_DEPLOY_HOOK }}" ]; then
+            curl -X POST -H "Content-Type: application/json" "${{ secrets.VERCEL_DEPLOY_HOOK }}" || exit 1
+          else
+            echo "No VERCEL_DEPLOY_HOOK set; relying on Vercel GitHub auto-deploy.";
+          fi
+
