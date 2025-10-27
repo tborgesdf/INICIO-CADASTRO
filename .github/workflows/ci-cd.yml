@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: repo
+        working-directory: .
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,7 +28,7 @@ jobs:
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           DB_NAME: ${{ secrets.DB_NAME }}
-        run: npm run db:migrate
+        run: node scripts/migrate.cjs
 
       - name: Trigger Vercel Deploy (Deploy Hook)
         if: success()
@@ -38,4 +38,3 @@ jobs:
           else
             echo "No VERCEL_DEPLOY_HOOK set; relying on Vercel GitHub auto-deploy.";
           fi
-
