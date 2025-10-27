@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mysql from 'mysql2/promise';
-import bcrypt from 'bcryptjs';
 import { signToken, setAuthCookie } from '../lib/auth';
+import * as crypto from 'crypto';
 
 export const config = { runtime: 'nodejs' };
 
@@ -19,7 +19,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const conn = await mysql.createConnection({ host: DB_HOST, user: DB_USER, password: DB_PASSWORD, database: DB_NAME });
     try {
-      const hash = await bcrypt.hash(String(password), 10);
+      const salt = crypto.randomBytes(16).toString('hex');
+      const iters = 100000;
+      const derived = crypto.pbkdf2Sync(String(password), salt, iters, 64, 'sha512').toString('hex');
+      const hash = `pbkdf2$${iters}$${salt}$${derived}`;
       await conn.execute(
         `INSERT INTO auth_accounts (email, provider, name, password_hash) VALUES (?, 'email', ?, ?)
          ON DUPLICATE KEY UPDATE name = VALUES(name), password_hash = VALUES(password_hash)`,

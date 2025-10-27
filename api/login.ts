@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mysql from 'mysql2/promise';
 import { signToken, setAuthCookie, clearAuthCookie } from '../lib/auth';
-import bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 
 export const config = { runtime: 'nodejs' };
 
@@ -21,7 +21,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const [rows] = await conn.execute(`SELECT id, password_hash FROM auth_accounts WHERE email = ? AND provider = 'email' LIMIT 1`, [String(email)]);
       const row = (rows as any)[0];
       if (!row || !row.password_hash) return res.status(401).json({ error: 'Invalid credentials' });
-      const ok = await bcrypt.compare(String(password), String(row.password_hash));
+      const stored: string = String(row.password_hash);
+      if (!stored.startsWith('pbkdf2$')) return res.status(401).json({ error: 'Invalid credentials' });
+      const [, iterStr, salt, hashHex] = stored.split('$');
+      const iters = Number(iterStr);
+      const derived = crypto.pbkdf2Sync(String(password), salt, iters, 64, 'sha512').toString('hex');
+      const ok = crypto.timingSafeEqual(Buffer.from(derived, 'hex'), Buffer.from(hashHex, 'hex'));
       if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
       const token = signToken({ accountId: row.id, email: String(email) });
       setAuthCookie(res, token);
