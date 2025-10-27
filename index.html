@@ -23,20 +23,30 @@
         background: #6a1b9a;
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.547.0",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.27.0"
-  }
-}
-</script>
-</head>
+    <!-- Import map removido: o bundle gerado pelo Vite inclui tudo necessário. -->
+    <script>
+      // Banner simples de erro de runtime para evitar tela branca silenciosa
+      window.addEventListener('error', function(e){
+        const b=document.createElement('div');
+        b.style.cssText='position:fixed;top:0;left:0;right:0;background:#fee2e2;color:#991b1b;padding:8px 12px;font:14px sans-serif;z-index:9999';
+        b.textContent='Erro ao carregar a aplicação: '+(e.error&&e.error.message||e.message);
+        document.body.appendChild(b);
+      });
+      window.addEventListener('unhandledrejection', function(e){
+        const b=document.createElement('div');
+        b.style.cssText='position:fixed;top:0;left:0;right:0;background:#fee2e2;color:#991b1b;padding:8px 12px;font:14px sans-serif;z-index:9999';
+        b.textContent='Falha ao iniciar: '+(e.reason&&e.reason.message||String(e.reason));
+        document.body.appendChild(b);
+      });
+    </script>
+  </head>
   <body class="bg-gray-100">
-    <div id="root"></div>
+    <noscript>
+      <div style="padding:16px;background:#fef3c7;color:#78350f;font:14px sans-serif">Ative o JavaScript para usar o aplicativo.</div>
+    </noscript>
+    <div id="root">
+      <div style="padding:16px;color:#4b5563;font:16px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial">Carregando aplicação…</div>
+    </div>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>
