@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { pool } from './db';
+import mysql from 'mysql2/promise';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -25,7 +25,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const lat = location?.latitude ?? null;
     const lng = location?.longitude ?? null;
 
-    const conn = await pool.getConnection();
+    const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME } = process.env as Record<string, string | undefined>;
+    if (!DB_HOST || !DB_USER || !DB_PASSWORD || !DB_NAME) {
+      return res.status(500).json({ error: 'Missing DB env vars' });
+    }
+
+    const conn = await mysql.createConnection({ host: DB_HOST, user: DB_USER, password: DB_PASSWORD, database: DB_NAME });
     try {
       await conn.beginTransaction();
 
@@ -70,11 +75,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await conn.commit();
       return res.status(200).json({ ok: true, userId });
     } catch (err: any) {
-      await (await conn).rollback();
+      try { await conn.rollback(); } catch {}
       console.error('DB error:', err);
       return res.status(500).json({ error: 'Database error', message: err?.message || String(err) });
     } finally {
-      conn.release();
+      await conn.end();
     }
   } catch (e) {
     console.error('Handler error:', e);
