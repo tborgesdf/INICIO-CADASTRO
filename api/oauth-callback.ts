@@ -56,7 +56,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const email = String(user.email || '');
     const name = String(user.name || '');
     const sub: string = String(user.sub || '');
-    const provider = sub.includes('google') ? 'google' : sub.includes('apple') ? 'apple' : 'email';
+    const provider = sub.includes('google')
+      ? 'google'
+      : sub.includes('apple')
+      ? 'apple'
+      : (sub.includes('microsoft') || sub.includes('windowslive'))
+      ? 'microsoft'
+      : 'email';
 
     const conn = await mysql.createConnection({ host: DB_HOST, user: DB_USER, password: DB_PASSWORD, database: DB_NAME });
     try {
