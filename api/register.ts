@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mysql from 'mysql2/promise';
-import { signToken, setAuthCookie } from './_auth';
+import { signToken, setAuthCookie } from '../lib/auth';
 
 export const config = { runtime: 'nodejs' };
 

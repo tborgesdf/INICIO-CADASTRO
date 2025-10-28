@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { clearAuthCookie } from './_auth';
+import { clearAuthCookie } from '../lib/auth';
 
 export const config = { runtime: 'nodejs' };
 

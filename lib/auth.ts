@@ -67,3 +67,4 @@ export function setAuthCookie(res: any, token: string) {
 export function clearAuthCookie(res: any) {
   res.setHeader('Set-Cookie', `auth_token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
 }
+
