@@ -1,4 +1,3 @@
-import type { VercelRequest } from '@vercel/node';
 import * as crypto from 'crypto';
 
 const COOKIE_NAME = 'auth_token';
@@ -44,7 +43,7 @@ export function signToken(payload: object, secret?: string) {
   return signHS256(payload, key);
 }
 
-export function verifyFromRequest(req: VercelRequest): { accountId: number; email: string } | null {
+export function verifyFromRequest(req: any): { accountId: number; email: string } | null {
   try {
     const key = process.env.JWT_SECRET || 'change-me-dev';
     const cookie = req.headers.cookie || '';
