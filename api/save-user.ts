@@ -31,10 +31,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const raw = (req as any).body;
     let body: any = {};
     try {
-      body = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
+      const raw = (req as any).body;
+      if (raw && typeof raw === 'string') {
+        body = JSON.parse(raw);
+      } else if (raw && typeof raw === 'object') {
+        body = raw;
+      } else {
+        const chunks: Buffer[] = [];
+        await new Promise<void>((resolve) => {
+          (req as any).on('data', (c: Buffer) => chunks.push(c));
+          (req as any).on('end', () => resolve());
+        });
+        if (chunks.length) {
+          body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        }
+      }
     } catch (e) {
       return res.status(400).json({ error: 'Invalid JSON body' });
     }
