@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mysql from 'mysql2/promise';
-import { verifyFromRequest } from './_auth';
+import { verifyFromRequestAsync } from './_auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       await conn.beginTransaction();
 
-      const session = verifyFromRequest(req);
+      const session = await verifyFromRequestAsync(req);
       const accountId = session?.accountId || null;
 
       const [userResult] = await conn.execute<import('mysql2').ResultSetHeader>(

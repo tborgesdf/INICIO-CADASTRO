@@ -1,7 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mysql from 'mysql2/promise';
-import bcrypt from 'bcryptjs';
-import { signToken, setAuthCookie } from './_auth';
+import { signTokenAsync, setAuthCookie } from './_auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).end('Method Not Allowed'); }
@@ -16,6 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const conn = await mysql.createConnection({ host: DB_HOST, user: DB_USER, password: DB_PASSWORD, database: DB_NAME });
   try {
+    const bcrypt: any = (await import('bcryptjs')).default ?? (await import('bcryptjs'));
     const hash = await bcrypt.hash(String(password), 10);
     await conn.execute(
       `INSERT INTO auth_accounts (email, provider, name, password_hash) VALUES (?, 'email', ?, ?)
@@ -24,11 +24,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     );
     const [rows] = await conn.query(`SELECT id FROM auth_accounts WHERE email = ? AND provider = 'email'`, [String(email)]);
     const accountId = (rows as any)[0]?.id as number;
-    const token = signToken({ accountId, email: String(email) });
+    const token = await signTokenAsync({ accountId, email: String(email) });
     setAuthCookie(res, token);
     return res.status(200).json({ ok: true, accountId });
   } catch (e: any) {
     return res.status(500).json({ error: 'DB error', message: e?.message || String(e) });
   } finally { await conn.end(); }
 }
-

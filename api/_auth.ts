@@ -1,15 +1,22 @@
 import type { VercelRequest } from '@vercel/node';
-import jwt from 'jsonwebtoken';
 
 const COOKIE_NAME = 'auth_token';
 
-export function signToken(payload: object, secret?: string) {
+async function getJwt() {
+  const mod: any = await import('jsonwebtoken');
+  // ESM/CJS interop
+  return mod.default ?? mod;
+}
+
+export async function signTokenAsync(payload: object, secret?: string) {
+  const jwt = await getJwt();
   const key = secret || process.env.JWT_SECRET || 'change-me-dev';
   return jwt.sign(payload, key, { expiresIn: '7d' });
 }
 
-export function verifyFromRequest(req: VercelRequest): { accountId: number; email: string } | null {
+export async function verifyFromRequestAsync(req: VercelRequest): Promise<{ accountId: number; email: string } | null> {
   try {
+    const jwt = await getJwt();
     const key = process.env.JWT_SECRET || 'change-me-dev';
     const cookie = req.headers.cookie || '';
     const m = cookie.split(';').map(s => s.trim()).find(s => s.startsWith(`${COOKIE_NAME}=`));
@@ -32,4 +39,3 @@ export function setAuthCookie(res: any, token: string) {
 export function clearAuthCookie(res: any) {
   res.setHeader('Set-Cookie', `auth_token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
 }
-
