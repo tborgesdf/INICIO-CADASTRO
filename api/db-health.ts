@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mysql from 'mysql2/promise';
 
+export const config = { runtime: 'nodejs18.x' };
+
 export default async function handler(_req: VercelRequest, res: VercelResponse) {
   const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME } = process.env as Record<string, string | undefined>;
 

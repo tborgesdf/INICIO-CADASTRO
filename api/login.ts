@@ -2,6 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mysql from 'mysql2/promise';
 import { signToken, setAuthCookie, clearAuthCookie } from './_auth';
 
+export const config = { runtime: 'nodejs18.x' };
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).end('Method Not Allowed'); }
   const raw = (req as any).body; let body: any = {};
