@@ -8,12 +8,12 @@ function parseCookie(req: any): string | null {
   const m = cookie.split(';').map((s: string) => s.trim()).find((s: string) => s.startsWith(`${COOKIE_NAME}=`));
   return m ? decodeURIComponent(m.split('=')[1]) : null;
 }
-function verifyToken(token: string, secret: string): any | null {
+async function verifyToken(token: string, secret: string): Promise<any | null> {
   try {
     const [h,p,sig] = token.split('.'); if (!(h && p && sig)) return null;
     const b2b = (s: string) => s.replace(/-/g,'+').replace(/_/g,'/');
     const data = `${h}.${p}`;
-    const expected = require('crypto').createHmac('sha256', secret).update(data).digest('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    const expected = (await import('crypto')).createHmac('sha256', secret).update(data).digest('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
     if (expected !== sig) return null;
     const json = Buffer.from(b2b(p), 'base64').toString('utf8');
     const payload = JSON.parse(json);
@@ -71,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       await conn.beginTransaction();
 
-      const session = (function(){ const tok=parseCookie(req); if(!tok) return null; const key=process.env.JWT_SECRET||'change-me-dev'; const dec=verifyToken(tok, key); return dec && dec.accountId ? { accountId: Number(dec.accountId), email: String(dec.email||'') } : null; })();
+      const session = (function(){ const tok=parseCookie(req); if(!tok) return null; const key=process.env.JWT_SECRET||'change-me-dev'; const dec=await verifyToken(tok, key); return dec && dec.accountId ? { accountId: Number(dec.accountId), email: String(dec.email||'') } : null; })();
       const accountId = session?.accountId || null;
 
       const encCpf = cpf ? encrypt(String(cpf)) : null;
@@ -133,5 +133,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Internal error', message: (e as any)?.message || String(e) });
   }
 }
+
+
+
 
 
