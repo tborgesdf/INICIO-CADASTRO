@@ -1,0 +1,17 @@
+PS C:\Users\Thiago Borges> $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+PS C:\Users\Thiago Borges> $b = New-Object 'System.Byte[]' 48; $rng.GetBytes($b); $jwtSecret = [Convert]::ToBase64String($b)
+PS C:\Users\Thiago Borges> $b2 = New-Object 'System.Byte[]' 32; $rng.GetBytes($b2); $adminToken = [Convert]::ToBase64String($b2)
+PS C:\Users\Thiago Borges> ([Convert]::FromBase64String($jwtSecret)).Length # deve imprimir 48
+48
+PS C:\Users\Thiago Borges> ([Convert]::FromBase64String($adminToken)).Length # deve imprimir 32
+32
+PS C:\Users\Thiago Borges> $jwtSecret
+ZWdNpMngY4dFFazy5+UEYUpK1HM0+X5FpkmmqQ1paVan2SlqF7SAtzTay1XKkPx7
+PS C:\Users\Thiago Borges> $adminToken
+9LPuVOd8mfxdERf+X3130Cp2V1ScJF0dGbpxjN5y2Uw=
+PS C:\Users\Thiago Borges>
+
+
+(Invoke-WebRequest -Uri "https://inicio-cadastro.vercel.app/api/diag-sec" -Headers @{ 'x-admin-token' = '9LPuVOd8mfxdERf+X3130Cp2V1ScJF0dGbpxjN5y2Uw=' } -TimeoutSec 60).Content
+
+$admin = '9LPuVOd8mfxdERf+X3130Cp2V1ScJF0dGbpxjN5y2Uw=' # ou: $admin = $env:ADMIN_TOKEN

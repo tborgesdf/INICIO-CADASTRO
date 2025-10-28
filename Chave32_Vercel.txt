@@ -1,0 +1,8 @@
+UM9BpXKoRaPuwx+GqRStVogNBHWsXF8RBc/rPQ7Kjxw= -  $encKey
+
+6cp0jCSOX+hQxy8P7NYf2S1//V6lBTSLQwUYcq40fD0= -  $hmacKey
+
+
+([Convert]::FromBase64String("UM9BpXKoRaPuwx+GqRStVogNBHWsXF8RBc/rPQ7Kjxw=")).Length → deve imprimir 32
+
+([Convert]::FromBase64String("6cp0jCSOX+hQxy8P7NYf2S1//V6lBTSLQwUYcq40fD0=")).Length → deve imprimir 32
