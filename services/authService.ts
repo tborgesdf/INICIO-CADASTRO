@@ -42,3 +42,40 @@ class AuthService {
 
 export const authService = new AuthService();
 
+// Auth service utilizado pelo front. Integra com nossas rotas serverless
+// para login/cadastro via e-mail/senha e inicia o fluxo OAuth via Auth0.
+
+class AuthService {
+  public async loginWithEmail(email: string, password: string): Promise<void> {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) throw new Error('Falha no login');
+  }
+
+  public async registerWithEmail(name: string, email: string, password: string): Promise<void> {
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password }),
+    });
+    if (!res.ok) throw new Error('Falha no cadastro');
+  }
+
+  // Inicia OAuth no Auth0 (conexões corretas)
+  public loginWithGoogle(): void {
+    window.location.href = '/api/oauth-start?connection=google-oauth2';
+  }
+
+  public loginWithApple(): void {
+    window.location.href = '/api/oauth-start?connection=apple';
+  }
+
+  public loginWithMicrosoft(): void {
+    window.location.href = '/api/oauth-start?connection=windowslive';
+  }
+}
+
+export const authService = new AuthService();
