@@ -1,5 +1,5 @@
 import type { VercelRequest } from '@vercel/node';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 
 const COOKIE_NAME = 'auth_token';
 
