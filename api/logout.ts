@@ -4,6 +4,10 @@ import { clearAuthCookie } from './_auth';
 export const config = { runtime: 'nodejs18.x' };
 
 export default async function handler(_req: VercelRequest, res: VercelResponse) {
-  clearAuthCookie(res);
-  return res.status(200).json({ ok: true });
+  try {
+    clearAuthCookie(res);
+    return res.status(200).json({ ok: true });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e?.message || String(e) });
+  }
 }
