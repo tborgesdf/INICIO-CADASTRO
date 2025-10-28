@@ -1,12 +1,31 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mysql from 'mysql2/promise';
-import { encrypt, blindIndex } from './_crypto';
+import * as crypto from 'crypto';
 
 const COOKIE_NAME = 'auth_token';
 function parseCookie(req: any): string | null {
   const cookie = req.headers.cookie || '';
   const m = cookie.split(';').map((s: string) => s.trim()).find((s: string) => s.startsWith(`${COOKIE_NAME}=`));
   return m ? decodeURIComponent(m.split('=')[1]) : null;
+}
+function getKey(varName: string, fallback?: string) {
+  const v = process.env[varName] || fallback;
+  if (!v) throw new Error(`Missing required env ${varName}`);
+  const buf = Buffer.from(v, 'base64');
+  if (buf.length !== 32) throw new Error(`${varName} must be 32 bytes, base64-encoded`);
+  return buf;
+}
+function encrypt(value: string) {
+  const key = getKey('DATA_ENC_KEY', process.env.NODE_ENV === 'production' ? undefined : Buffer.from('dev_enc_key_32_bytes_dev_enc_key_32_b').toString('base64'));
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const ciphertext = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([iv, tag, ciphertext]).toString('base64');
+}
+function blindIndex(value: string) {
+  const key = getKey('DATA_HMAC_KEY', process.env.NODE_ENV === 'production' ? undefined : Buffer.from('dev_hmac_key_32_bytes_dev_hmac_key_32').toString('base64'));
+  return crypto.createHmac('sha256', key).update(value, 'utf8').digest('hex');
 }
 async function verifyToken(token: string, secret: string): Promise<any | null> {
   try {
