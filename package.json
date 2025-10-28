@@ -1,35 +1,35 @@
 {
-  "name": "inicio-cadastro",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "dev:api": "node dev-server.cjs",
-    "build": "vite build",
-    "preview": "vite preview",
-    "db:init": "node scripts/run-sql.cjs",
-    "db:migrate": "node scripts/migrate.cjs"
-  },
-  "dependencies": {
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "lucide-react": "^0.547.0",
-    "@google/genai": "^1.27.0",
-    "mysql2": "^3.11.5",
-    "express": "^4.21.2",
-    "body-parser": "^1.20.3",
-    "dotenv": "^16.4.7",
-    "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2"
-  },
-  "devDependencies": {
-    "@vercel/node": "^5.5.0",
-    "@types/node": "^22.14.0",
-    "@types/jsonwebtoken": "^9.0.6",
-    "@types/bcryptjs": "^2.4.6",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
-  }
+    "name":  "inicio-cadastro",
+    "private":  true,
+    "version":  "0.0.0",
+    "type":  "module",
+    "scripts":  {
+                    "dev":  "vite",
+                    "dev:api":  "node dev-server.cjs",
+                    "build":  "vite build",
+                    "preview":  "vite preview",
+                    "db:init":  "node scripts/run-sql.cjs",
+                    "db:migrate":  "node scripts/migrate.cjs"
+                },
+    "dependencies":  {
+                         "react":  "^19.2.0",
+                         "react-dom":  "^19.2.0",
+                         "lucide-react":  "^0.547.0",
+                         "@google/genai":  "^1.27.0",
+                         "mysql2":  "^3.11.5",
+                         "express":  "^4.21.2",
+                         "body-parser":  "^1.20.3",
+                         "dotenv":  "^16.4.7",
+                         "bcryptjs":  "^2.4.3",
+                         "jsonwebtoken":  "^9.0.2"
+                     },
+    "devDependencies":  {
+                            "@vercel/node":  "^5.5.0",
+                            "@types/node":  "^22.14.0",
+                            "@types/jsonwebtoken":  "^9.0.6",
+                            "@types/bcryptjs":  "^2.4.6",
+                            "@vitejs/plugin-react":  "^5.0.0",
+                            "typescript":  "~5.8.2",
+                            "vite":  "^6.2.0"
+                        }
 }
