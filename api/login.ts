@@ -21,6 +21,11 @@ function signToken(payload: object, secret?: string) {
   const key = secret || process.env.JWT_SECRET || 'change-me-dev';
   return signHS256(payload, key);
 }
+function blindIndex(value: string) {
+  const v = process.env.DATA_HMAC_KEY || Buffer.from('dev_hmac_key_32_bytes_dev_hmac_key_32').toString('base64');
+  const key = Buffer.from(v, 'base64');
+  return crypto.createHmac('sha256', key).update(value, 'utf8').digest('hex');
+}
 function setAuthCookie(res: any, token: string) {
   const isProd = process.env.NODE_ENV === 'production';
   const cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${2*24*60*60}; ${isProd ? 'Secure' : ''}`;
@@ -55,15 +60,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch {
       return res.status(400).json({ error: 'Invalid JSON' });
     }
-    const { email, password } = body;
-    if (!email || !password) return res.status(400).json({ error: 'Missing email/password' });
+    const { email, cpf, password } = body;
+    if ((!email && !cpf) || !password) return res.status(400).json({ error: 'Missing identifier/password' });
 
     const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME } = process.env as Record<string, string | undefined>;
     if (!DB_HOST || !DB_USER || !DB_PASSWORD || !DB_NAME) return res.status(500).json({ error: 'Missing DB env vars' });
 
     const conn = await mysql.createConnection({ host: DB_HOST, user: DB_USER, password: DB_PASSWORD, database: DB_NAME });
     try {
-      const [rows] = await conn.execute(`SELECT id, password_hash FROM auth_accounts WHERE email = ? AND provider = 'email' LIMIT 1`, [String(email)]);
+      let rows: any[] = [];
+      if (email) {
+        const [r] = await conn.execute(`SELECT id, password_hash FROM auth_accounts WHERE email = ? AND provider = 'email' LIMIT 1`, [String(email)]);
+        rows = r as any[];
+      } else {
+        const cpfBidx = blindIndex(String(cpf));
+        const [r] = await conn.execute(`
+          SELECT aa.id, aa.password_hash
+          FROM auth_accounts aa
+          JOIN users u ON u.account_id = aa.id
+          WHERE u.cpf_bidx = ? AND aa.provider = 'email'
+          LIMIT 1
+        `, [cpfBidx]);
+        rows = r as any[];
+      }
       const row = (rows as any)[0];
       if (!row || !row.password_hash) return res.status(401).json({ error: 'Invalid credentials' });
       const stored: string = String(row.password_hash);
