@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mysql from 'mysql2/promise';
-import { signTokenAsync, setAuthCookie, clearAuthCookie } from './_auth';
+import { signToken, setAuthCookie, clearAuthCookie } from './_auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).end('Method Not Allowed'); }
@@ -20,7 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const bcrypt: any = (await import('bcryptjs')).default ?? (await import('bcryptjs'));
     const ok = await bcrypt.compare(String(password), String(row.password_hash));
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
-    const token = await signTokenAsync({ accountId: row.id, email: String(email) });
+    const token = signToken({ accountId: row.id, email: String(email) });
     setAuthCookie(res, token);
     return res.status(200).json({ ok: true, accountId: row.id });
   } catch (e: any) {

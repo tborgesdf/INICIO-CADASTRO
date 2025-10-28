@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mysql from 'mysql2/promise';
-import { signTokenAsync, setAuthCookie } from './_auth';
+import { signToken, setAuthCookie } from './_auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).end('Method Not Allowed'); }
@@ -24,7 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     );
     const [rows] = await conn.query(`SELECT id FROM auth_accounts WHERE email = ? AND provider = 'email'`, [String(email)]);
     const accountId = (rows as any)[0]?.id as number;
-    const token = await signTokenAsync({ accountId, email: String(email) });
+    const token = signToken({ accountId, email: String(email) });
     setAuthCookie(res, token);
     return res.status(200).json({ ok: true, accountId });
   } catch (e: any) {

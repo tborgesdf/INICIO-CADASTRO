@@ -1,28 +1,57 @@
 import type { VercelRequest } from '@vercel/node';
+import crypto from 'crypto';
 
 const COOKIE_NAME = 'auth_token';
 
-async function getJwt() {
-  const mod: any = await import('jsonwebtoken');
-  // ESM/CJS interop
-  return mod.default ?? mod;
+function b64url(input: Buffer | string) {
+  const base = (typeof input === 'string' ? Buffer.from(input) : input)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+  return base;
 }
 
-export async function signTokenAsync(payload: object, secret?: string) {
-  const jwt = await getJwt();
+function signHS256(payload: any, secret: string) {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const now = Math.floor(Date.now() / 1000);
+  const withExp = { ...payload, iat: now, exp: now + 7 * 24 * 60 * 60 };
+  const encHeader = b64url(JSON.stringify(header));
+  const encPayload = b64url(JSON.stringify(withExp));
+  const data = `${encHeader}.${encPayload}`;
+  const sig = crypto.createHmac('sha256', secret).update(data).digest('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return `${data}.${sig}`;
+}
+
+function verifyHS256(token: string, secret: string): any | null {
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  const [encHeader, encPayload, signature] = parts;
+  const data = `${encHeader}.${encPayload}`;
+  const expected = crypto.createHmac('sha256', secret).update(data).digest('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  if (expected !== signature) return null;
+  const payloadJson = Buffer.from(encPayload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+  const payload = JSON.parse(payloadJson);
+  const now = Math.floor(Date.now() / 1000);
+  if (payload.exp && now > payload.exp) return null;
+  return payload;
+}
+
+export function signToken(payload: object, secret?: string) {
   const key = secret || process.env.JWT_SECRET || 'change-me-dev';
-  return jwt.sign(payload, key, { expiresIn: '7d' });
+  return signHS256(payload, key);
 }
 
-export async function verifyFromRequestAsync(req: VercelRequest): Promise<{ accountId: number; email: string } | null> {
+export function verifyFromRequest(req: VercelRequest): { accountId: number; email: string } | null {
   try {
-    const jwt = await getJwt();
     const key = process.env.JWT_SECRET || 'change-me-dev';
     const cookie = req.headers.cookie || '';
     const m = cookie.split(';').map(s => s.trim()).find(s => s.startsWith(`${COOKIE_NAME}=`));
     if (!m) return null;
     const token = decodeURIComponent(m.split('=')[1]);
-    const decoded = jwt.verify(token, key) as any;
+    const decoded = verifyHS256(token, key) as any;
     if (decoded && decoded.accountId) return { accountId: Number(decoded.accountId), email: String(decoded.email || '') };
     return null;
   } catch {
