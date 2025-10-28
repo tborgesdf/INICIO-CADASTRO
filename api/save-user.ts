@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mysql from 'mysql2/promise';
-import { encrypt, blindIndex } from '../lib/crypto';
+import { encrypt, blindIndex } from './_crypto';
 
 const COOKIE_NAME = 'auth_token';
 function parseCookie(req: any): string | null {
@@ -140,6 +140,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json(body);
   }
 }
+
 
 
 
