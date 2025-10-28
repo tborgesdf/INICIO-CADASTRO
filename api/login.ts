@@ -23,7 +23,7 @@ function signToken(payload: object, secret?: string) {
 }
 function setAuthCookie(res: any, token: string) {
   const isProd = process.env.NODE_ENV === 'production';
-  const cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7*24*60*60}; ${isProd ? 'Secure' : ''}`;
+  const cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${2*24*60*60}; ${isProd ? 'Secure' : ''}`;
   res.setHeader('Set-Cookie', cookie);
 }
 function clearAuthCookie(res: any) {

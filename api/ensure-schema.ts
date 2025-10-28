@@ -29,24 +29,49 @@ async function ensureUsers(conn: mysql.Connection) {
     CREATE TABLE IF NOT EXISTS users (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
       account_id BIGINT UNSIGNED NULL,
-      cpf VARCHAR(32) NOT NULL,
-      phone VARCHAR(32) NOT NULL,
-      email VARCHAR(255) NOT NULL,
+      cpf VARCHAR(32) NULL,
+      phone VARCHAR(32) NULL,
+      email VARCHAR(255) NULL,
+      cpf_enc VARBINARY(768) NULL,
+      phone_enc VARBINARY(768) NULL,
+      email_enc VARBINARY(768) NULL,
+      cpf_bidx CHAR(64) NULL,
+      email_bidx CHAR(64) NULL,
       latitude DECIMAL(10,7) NULL,
       longitude DECIMAL(10,7) NULL,
       visa_type ENUM('renewal','first_visa') NOT NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (id),
-      KEY idx_users_email (email)
+      KEY idx_users_email (email),
+      KEY idx_users_email_bidx (email_bidx),
+      KEY idx_users_cpf_bidx (cpf_bidx)
     ) ENGINE=InnoDB;
   `);
 
-  // Ensure visa_type has correct ENUM options
-  // This will also work if column already exists with different set
-  await conn.execute(`
-    ALTER TABLE users 
-      MODIFY COLUMN visa_type ENUM('renewal','first_visa') NOT NULL
-  `);
+  // Ensure visa_type, sensitive columns and indexes exist
+  await conn.execute(`ALTER TABLE users MODIFY COLUMN visa_type ENUM('renewal','first_visa') NOT NULL`);
+  const [colsCpfEnc] = await conn.query("SHOW COLUMNS FROM users LIKE 'cpf_enc'");
+  if ((colsCpfEnc as any[]).length === 0) {
+    await conn.execute("ALTER TABLE users ADD COLUMN cpf_enc VARBINARY(768) NULL AFTER email");
+  }
+  const [colsPhoneEnc] = await conn.query("SHOW COLUMNS FROM users LIKE 'phone_enc'");
+  if ((colsPhoneEnc as any[]).length === 0) {
+    await conn.execute("ALTER TABLE users ADD COLUMN phone_enc VARBINARY(768) NULL AFTER cpf_enc");
+  }
+  const [colsEmailEnc] = await conn.query("SHOW COLUMNS FROM users LIKE 'email_enc'");
+  if ((colsEmailEnc as any[]).length === 0) {
+    await conn.execute("ALTER TABLE users ADD COLUMN email_enc VARBINARY(768) NULL AFTER phone_enc");
+  }
+  const [colsCpfBidx] = await conn.query("SHOW COLUMNS FROM users LIKE 'cpf_bidx'");
+  if ((colsCpfBidx as any[]).length === 0) {
+    await conn.execute("ALTER TABLE users ADD COLUMN cpf_bidx CHAR(64) NULL AFTER email_enc");
+    await conn.execute("ALTER TABLE users ADD KEY idx_users_cpf_bidx (cpf_bidx)");
+  }
+  const [colsEmailBidx] = await conn.query("SHOW COLUMNS FROM users LIKE 'email_bidx'");
+  if ((colsEmailBidx as any[]).length === 0) {
+    await conn.execute("ALTER TABLE users ADD COLUMN email_bidx CHAR(64) NULL AFTER cpf_bidx");
+    await conn.execute("ALTER TABLE users ADD KEY idx_users_email_bidx (email_bidx)");
+  }
 
   // Ensure FK to auth_accounts
   const [fkRows] = await conn.query("SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_NAME='users' AND REFERENCED_TABLE_NAME='auth_accounts' AND COLUMN_NAME='account_id'");
@@ -103,4 +128,3 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
     await conn.end();
   }
 }
-

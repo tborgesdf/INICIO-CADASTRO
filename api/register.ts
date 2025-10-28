@@ -19,11 +19,14 @@ function signHS256(payload: any, secret: string) {
 }
 function signToken(payload: object, secret?: string) {
   const key = secret || process.env.JWT_SECRET || 'change-me-dev';
+  if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || (process.env.JWT_SECRET || '').length < 32)) {
+    throw new Error('JWT_SECRET must be set to a strong value in production');
+  }
   return signHS256(payload, key);
 }
 function setAuthCookie(res: any, token: string) {
   const isProd = process.env.NODE_ENV === 'production';
-  const cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7*24*60*60}; ${isProd ? 'Secure' : ''}`;
+  const cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${2*24*60*60}; ${isProd ? 'Secure' : ''}`;
   res.setHeader('Set-Cookie', cookie);
 }
 

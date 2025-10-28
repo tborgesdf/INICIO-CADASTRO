@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mysql from 'mysql2/promise';
+import { encrypt, blindIndex } from '../lib/crypto';
 
 const COOKIE_NAME = 'auth_token';
 function parseCookie(req: any): string | null {
@@ -73,9 +74,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const session = (function(){ const tok=parseCookie(req); if(!tok) return null; const key=process.env.JWT_SECRET||'change-me-dev'; const dec=verifyToken(tok, key); return dec && dec.accountId ? { accountId: Number(dec.accountId), email: String(dec.email||'') } : null; })();
       const accountId = session?.accountId || null;
 
+      const encCpf = cpf ? encrypt(String(cpf)) : null;
+      const encPhone = phone ? encrypt(String(phone)) : null;
+      const encEmail = email ? encrypt(String(email)) : null;
+      const cpfBidx = cpf ? blindIndex(String(cpf)) : null;
+      const emailBidx = email ? blindIndex(String(email)) : null;
+
       const [userResult] = await conn.execute<import('mysql2').ResultSetHeader>(
-        `INSERT INTO users (account_id, cpf, phone, email, latitude, longitude, visa_type) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [accountId, cpf, phone, email, lat, lng, visaType]
+        `INSERT INTO users (account_id, cpf, phone, email, cpf_enc, phone_enc, email_enc, cpf_bidx, email_bidx, latitude, longitude, visa_type)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [accountId, cpf ?? null, phone ?? null, email ?? null, encCpf, encPhone, encEmail, cpfBidx, emailBidx, lat, lng, visaType]
       );
 
       const userId = (userResult as any).insertId as number;
