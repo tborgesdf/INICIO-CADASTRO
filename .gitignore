@@ -1,0 +1,16 @@
+TOKEN_OPENAI.txt
+Token Classico GitHub.txt
+client_secret_*.json
+SUPERBASE.txt
+BD_MYSQL_Hostgator.txt
+repo.zip
+tmp_*.txt
+ARQUIVOS/**
+DOCUMENTOS/**
+EXEMPLOS/**
+.vscode/**
+node_modules
+
+node_modules/
+dist/
+.vercel/
