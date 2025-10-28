@@ -82,18 +82,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         }
     };
     
-    const handleSocialLogin = async (provider: 'google' | 'apple') => {
-        setIsLoading(true);
-        try {
-            if (provider === 'google') await authService.loginWithGoogle();
-            else await authService.loginWithApple();
-            onLoginSuccess();
-        } catch (error) {
-            // Handle error
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    // Social logins desativados (Google/Apple/Microsoft removidos)
 
     return (
         <div className="animate-fade-in">
@@ -121,15 +110,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                  {isLoginView && <a href="#" className="block text-center text-sm text-purple-700 hover:underline mt-2">Esqueceu sua senha?</a>}
             </form>
 
-            <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-gray-300"></span></div>
-                <div className="relative flex justify-center text-sm"><span className="bg-white px-2 text-gray-500">Ou continue com</span></div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-4">
-                <SocialButton icon={<GoogleIcon />} text="Google" onClick={() => handleSocialLogin('google')} disabled={isLoading} />
-                <SocialButton icon={<AppleIcon />} text="Apple" onClick={() => handleSocialLogin('apple')} disabled={isLoading} />
-            </div>
+            {/* Social logins removidos para simplificar o fluxo. */}
         </div>
     );
 };
