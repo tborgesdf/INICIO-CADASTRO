@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { signToken, verifyFromRequest } from './_auth';
 
-export const config = { runtime: 'nodejs18.x' };
+export const config = { runtime: 'nodejs' };
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   try {
