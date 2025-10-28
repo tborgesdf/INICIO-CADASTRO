@@ -71,7 +71,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       await conn.beginTransaction();
 
-      const session = (function(){ const tok=parseCookie(req); if(!tok) return null; const key=process.env.JWT_SECRET||'change-me-dev'; const dec=await verifyToken(tok, key); return dec && dec.accountId ? { accountId: Number(dec.accountId), email: String(dec.email||'') } : null; })();
+      const tok = parseCookie(req);
+      const key = process.env.JWT_SECRET || 'change-me-dev';
+      const dec = tok ? await verifyToken(tok, key) : null;
+      const session = dec && dec.accountId ? { accountId: Number(dec.accountId), email: String(dec.email || '') } : null;
       const accountId = session?.accountId || null;
 
       const encCpf = cpf ? encrypt(String(cpf)) : null;
@@ -124,13 +127,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch (err: any) {
       try { await conn.rollback(); } catch {}
       console.error('DB error:', err);
-      return res.status(500).json({ error: 'Database error', message: err?.message || String(err) });
+      const isAdmin = process.env.NODE_ENV !== 'production' || ((process.env.ADMIN_TOKEN || '') && (((req.headers['x-admin-token'] as string) || '') === process.env.ADMIN_TOKEN));
+      const body = isAdmin ? { error: 'Database error', message: err?.message || String(err), stack: err?.stack || '' } : { error: 'Database error' };
+      return res.status(500).json(body);
     } finally {
       await conn.end();
     }
   } catch (e) {
     console.error('Handler error:', e);
-    return res.status(500).json({ error: 'Internal error', message: (e as any)?.message || String(e) });
+    const isAdmin = process.env.NODE_ENV !== 'production' || ((process.env.ADMIN_TOKEN || '') && (((req.headers['x-admin-token'] as string) || '') === process.env.ADMIN_TOKEN));
+    const body = isAdmin ? { error: 'Internal error', message: (e as any)?.message || String(e), stack: (e as any)?.stack || '' } : { error: 'Internal error' };
+    return res.status(500).json(body);
   }
 }
 
