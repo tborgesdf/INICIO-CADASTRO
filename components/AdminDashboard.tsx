@@ -30,26 +30,26 @@ const AdminDashboard: React.FC = () => {
   const [metrics, setMetrics] = React.useState<any | null>(null);
 
   const check = async () => {
-    try { const r = await fetch('/api/admin2?action=me'); const j = await r.json(); setAuthed(!!j.ok); } catch { setAuthed(false); }
+    try { const r = await fetch('/api/admin3?action=me'); const j = await r.json(); setAuthed(!!j.ok); } catch { setAuthed(false); }
   };
   React.useEffect(() => { check(); }, []);
 
   const login = async (e: React.FormEvent) => {
     e.preventDefault(); setError(''); setLoading(true);
     try {
-      const r = await fetch('/api/admin2?action=admin-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: admEmail, password: admPassword }) });
+      const r = await fetch('/api/admin3?action=admin-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: admEmail, password: admPassword }) });
       if (!r.ok) { const j = await r.json().catch(()=>({})); throw new Error(j?.error || 'Falha ao autenticar'); }
       setAdmEmail(''); setAdmPassword(''); await check();
     } catch (err:any) { setError(err?.message || 'Erro'); } finally { setLoading(false); }
   };
 
-  const logout = async () => { await fetch('/api/admin2?action=logout', { method: 'POST' }); setAuthed(false); setRows([]); };
+  const logout = async () => { await fetch('/api/admin3?action=logout', { method: 'POST' }); setAuthed(false); setRows([]); };
 
   const load = async () => {
     if (!authed) return;
     const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
     for (const [k,v] of Object.entries(filters)) if (v) qs.set(k, v);
-    const r = await fetch(`/api/admin2?action=users&${qs.toString()}`);
+    const r = await fetch(`/api/admin3?action=users&${qs.toString()}`);
     const j = await r.json();
     if (!r.ok || !j.ok) throw new Error(j?.error || 'Falha ao carregar');
     setRows(j.rows || []); setTotal(j.total || 0);
@@ -59,7 +59,7 @@ const AdminDashboard: React.FC = () => {
   const onFilterSubmit = (e: React.FormEvent) => { e.preventDefault(); setPage(1); load().catch(()=>{}); };
 
   const openDetail = async (id: number) => {
-    const r = await fetch(`/api/admin2?action=user&id=${id}`);
+    const r = await fetch(`/api/admin3?action=user&id=${id}`);
     const j = await r.json();
     if (!r.ok || !j.ok) return;
     setDetail(j);
@@ -71,7 +71,7 @@ const AdminDashboard: React.FC = () => {
     if (filters.visaType) qs.set('visaType', filters.visaType);
     if (filters.from) qs.set('from', filters.from);
     if (filters.to) qs.set('to', filters.to);
-    const r = await fetch(`/api/admin2?action=metrics&${qs.toString()}`);
+    const r = await fetch(`/api/admin3?action=metrics&${qs.toString()}`);
     const j = await r.json();
     if (!r.ok || !j.ok) return;
     setMetrics(j);
