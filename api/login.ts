@@ -97,6 +97,68 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
       const token = signToken({ accountId: row.id, email: String(email) });
       setAuthCookie(res, token);
+
+      // logar acesso (action=login) similar ao /api/client-log
+      try {
+        const h: any = req.headers || {};
+        // Enriquecimento básico com ipapi.co (best-effort)
+        const ipRaw = (h['x-real-ip'] as string) || (h['x-forwarded-for'] as string) || '';
+        const clientIp = (ipRaw || '').split(',')[0].trim();
+        let isp: string | null = null; let asn: string | null = null;
+        try {
+          const ctl = new AbortController();
+          const t = setTimeout(() => ctl.abort(), 2500);
+          const url = clientIp ? `https://ipapi.co/${clientIp}/json/` : `https://ipapi.co/json/`;
+          const r = await fetch(url, { signal: ctl.signal }); clearTimeout(t);
+          if (r.ok) { const j: any = await r.json(); isp = String(j.org||'')||null; asn = String(j.asn||'')||null; }
+        } catch {}
+        await conn.query(
+          `CREATE TABLE IF NOT EXISTS access_logs (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            action VARCHAR(64) NOT NULL,
+            ip VARCHAR(64) NULL,
+            port VARCHAR(16) NULL,
+            method VARCHAR(8) NULL,
+            path TEXT NULL,
+            user_agent TEXT NULL,
+            referer TEXT NULL,
+            country VARCHAR(8) NULL,
+            region VARCHAR(64) NULL,
+            city VARCHAR(64) NULL,
+            latitude VARCHAR(32) NULL,
+            longitude VARCHAR(32) NULL,
+            accept_language VARCHAR(128) NULL,
+            x_forwarded_for TEXT NULL,
+            account_email VARCHAR(255) NULL,
+            extra TEXT NULL,
+            PRIMARY KEY (id)
+          ) ENGINE=InnoDB`);
+        const extra = JSON.stringify({ isp, asn });
+        await conn.query(
+          `INSERT INTO access_logs (action, ip, port, method, path, user_agent, referer, country, region, city, latitude, longitude, accept_language, x_forwarded_for, account_email, extra)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [
+            'login',
+            clientIp,
+            (h['x-vercel-forwarded-for-port'] as string) || '',
+            req.method || '',
+            req.url || '',
+            (h['user-agent'] as string) || '',
+            (h['referer'] as string) || '',
+            (h['x-vercel-ip-country'] as string) || '',
+            (h['x-vercel-ip-country-region'] as string) || '',
+            (h['x-vercel-ip-city'] as string) || '',
+            (h['x-vercel-ip-latitude'] as string) || '',
+            (h['x-vercel-ip-longitude'] as string) || '',
+            (h['accept-language'] as string) || '',
+            (h['x-forwarded-for'] as string) || '',
+            String(email || ''),
+            extra,
+          ]
+        );
+      } catch {}
+
       return res.status(200).json({ ok: true, accountId: row.id });
     } catch (e: any) {
       return res.status(500).json({ error: 'DB error', message: e?.message || String(e) });

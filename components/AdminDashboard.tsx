@@ -110,6 +110,23 @@ const AdminDashboard: React.FC = () => {
     const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='cadastros.csv'; a.click(); URL.revokeObjectURL(url);
   };
 
+  const visaLabel = (v?: string) => v === 'renewal' ? 'Renovação' : v === 'first_visa' ? 'Primeiro visto' : (v || '-');
+
+  const locForRow = (r: any): { href?: string; text: string } => {
+    if (r && r.latitude != null && r.longitude != null && r.latitude !== '' && r.longitude !== '') {
+      const lat = Number(r.latitude);
+      const lng = Number(r.longitude);
+      if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+        const latS = lat.toFixed(4);
+        const lngS = lng.toFixed(4);
+        return { href: `https://www.google.com/maps?q=${latS},${lngS}`, text: `${latS}, ${lngS}` };
+      }
+    }
+    const country = (r as any)?.countries ? String((r as any).countries).split(',')[0] : '';
+    if (country) return { href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(country)}`, text: country };
+    return { text: '-' };
+  };
+
   if (authed === null) return <div>Verificando...</div>;
   if (!authed) return (
     <div>
@@ -191,13 +208,11 @@ const AdminDashboard: React.FC = () => {
             <tr>
               <th className="px-3 py-2"><input type="checkbox" onChange={(e)=>{ const all=new Set<number>(); if (e.target.checked) rows.forEach(r=>all.add(r.id)); setSelected(all); }} checked={selected.size>0 && selected.size===rows.length} /></th>
               <th className="text-left px-3 py-2">ID</th>
-              {canView('name') && <th className="text-left px-3 py-2">Nome</th>}
-              {canView('email') && <th className="text-left px-3 py-2">E-mail</th>}
-              {canView('cpf') && <th className="text-left px-3 py-2">CPF</th>}
-              {canView('phone') && <th className="text-left px-3 py-2">Telefone</th>}
-              {canView('visa_type') && <th className="text-left px-3 py-2">Visto</th>}
-              {canView('countries') && <th className="text-left px-3 py-2">País</th>}
-              <th className="text-left px-3 py-2">Criado em</th>
+              <th className="text-left px-3 py-2">Nome Completo</th>
+              <th className="text-left px-3 py-2">Data e Hora</th>
+              <th className="text-left px-3 py-2">Localização</th>
+              <th className="text-left px-3 py-2">Tipo de visto</th>
+              <th className="text-left px-3 py-2">País</th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
@@ -206,14 +221,14 @@ const AdminDashboard: React.FC = () => {
               <tr key={r.id} className="border-t">
                 <td className="px-3 py-2"><input type="checkbox" checked={selected.has(r.id)} onChange={(e)=>{ const s=new Set(selected); if(e.target.checked) s.add(r.id); else s.delete(r.id); setSelected(s); }} /></td>
                 <td className="px-3 py-2">{r.id}</td>
-                {canView('name') && <td className="px-3 py-2">{r.name || '-'}</td>}
-                {canView('email') && <td className="px-3 py-2">{r.email}</td>}
-                {canView('cpf') && <td className="px-3 py-2">{r.cpf}</td>}
-                {canView('phone') && <td className="px-3 py-2">{r.phone || '-'}</td>}
-                {canView('visa_type') && <td className="px-3 py-2">{visaLabel(r.visa_type)}</td>}
-                {canView('countries') && <td className="px-3 py-2">{(r as any).countries ? String((r as any).countries).split(',')[0] : '-'}</td>}
+                <td className="px-3 py-2">{r.name || '-'}</td>
                 <td className="px-3 py-2">{fmtBR(r.created_at)}</td>
-                <td className="px-3 py-2 text-right flex gap-3 justify-end">
+                <td className="px-3 py-2">
+                  {(() => { const v=locForRow(r); return v.href? <a href={v.href} target="_blank" rel="noreferrer" className="text-purple-700 underline">{v.text}</a> : v.text; })()}
+                </td>
+                <td className="px-3 py-2">{visaLabel(r.visa_type)}</td>
+                <td className="px-3 py-2">{(r as any).countries ? String((r as any).countries).split(',')[0] : '-'}</td>
+                <td className="px-3 py-2 text-right flex gap-3 justify-end whitespace-nowrap">
                   <button onClick={()=>openDetail(r.id)} className="text-purple-700 underline">Ver</button>
                   {(someEditable) && <button onClick={()=>startEdit(r.id)} className="text-blue-700 underline">Editar</button>}
                 </td>
@@ -250,17 +265,20 @@ const AdminDashboard: React.FC = () => {
           </div>
           <div className="p-3 border rounded bg-white">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-sm font-semibold">Ultimas cidades que acessaram</div>
+              <div className="text-sm font-semibold">Ultimos acessos</div>
               <button onClick={()=>loadMetrics()} className="text-xs text-purple-700 underline">Atualizar</button>
             </div>
             <ul className="divide-y max-h-[300px] overflow-auto text-sm">
-              {(metrics.recentCities||[]).map((c:any, i:number)=> (
-                <li key={i} className="py-1 flex items-center justify-between">
-                  <span>{c.city || '-'}{c.country? `, ${c.country}`:''}</span>
-                  <span className="text-gray-500">{fmtBR(c.last_at)}</span>
+              {((metrics.recentAccess||metrics.recentCities)||[]).map((c:any, i:number)=> (
+                <li key={i} className="py-2">
+                  <div className="flex items-center justify-between">
+                    <span>{(function(){ try{ return decodeURIComponent(String(c.city||'')); }catch{ return String(c.city||''); }})()}{c.country? `, ${c.country}`:''}</span>
+                    <span className="text-gray-500">{fmtBR(c.last_at)}</span>
+                  </div>
+                  <div className="text-xs text-gray-600 mt-1">ISP: {c.isp || '-'} • Proxy: Breve • Tor: Breve</div>
                 </li>
               ))}
-              {(!metrics.recentCities || metrics.recentCities.length===0) && <li className="py-2 text-gray-500">Sem dados</li>}
+              {(!metrics.recentAccess && (!metrics.recentCities || metrics.recentCities.length===0)) && <li className="py-2 text-gray-500">Sem dados</li>}
             </ul>
           </div>
         </div>
@@ -298,6 +316,19 @@ const AdminDashboard: React.FC = () => {
               <div><strong>Tipo de visto:</strong> {visaLabel(detail.user?.visa_type)}</div>
               <div><strong>Coordenadas:</strong> {detail.user?.latitude},{detail.user?.longitude}</div>
               <div className="md:col-span-2"><strong>Criado em:</strong> {fmtBR(detail.user?.created_at)}</div>
+            </div>
+            <div className="mt-3">
+              <h4 className="font-semibold mb-1">Logins realizados</h4>
+              {(detail.loginLogs||[]).length ? (
+                <ul className="divide-y text-xs">
+                  {detail.loginLogs.map((l:any, i:number)=> (
+                    <li key={i} className="py-1 flex items-center justify-between">
+                      <span>{l.city||'-'}{l.country?`, ${l.country}`:''}</span>
+                      <span className="text-gray-500">{fmtBR(l.created_at)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="text-sm text-gray-500">Nenhum</p>}
             </div>
             <div className="mt-3">
               <h4 className="font-semibold mb-1">Redes sociais</h4>

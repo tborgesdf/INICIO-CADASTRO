@@ -8,6 +8,8 @@ import CompletionScreen from './components/CompletionScreen';
 import VisaTypeScreen from './components/VisaTypeScreen';
 import Chatbot from './components/Chatbot';
 import LoginScreen from './components/LoginScreen';
+import PostLoginMenu from './components/PostLoginMenu';
+import MyProcesses from './components/MyProcesses';
 import AdminDashboard from './components/AdminDashboard';
 import AdminUsers from './components/AdminUsers';
 
@@ -41,11 +43,12 @@ const FedExLogo: React.FC = () => (
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [postLoginChoice, setPostLoginChoice] = useState<null | 'new' | 'continue' | 'track'>(null);
   const [step, setStep] = useState(1);
   const [userData, setUserData] = useState<Partial<UserData>>({});
 
   const nextStep = () => setStep(prev => prev + 1);
-  const handleLoginSuccess = () => setIsAuthenticated(true);
+  const handleLoginSuccess = () => { setIsAuthenticated(true); setPostLoginChoice(null); };
 
   const renderStep = () => {
     switch (step) {
@@ -65,6 +68,7 @@ function App() {
   };
 
   const isAdminRoute = typeof window !== 'undefined' && (window.location.hash === '#/admin' || window.location.hash === '#/admin-users');
+  const isMyProcesses = typeof window !== 'undefined' && window.location.hash === '#/my-processes';
   const containerMax = isAdminRoute ? 'max-w-6xl' : 'max-w-2xl';
   const isAdminUsers = typeof window !== 'undefined' && window.location.hash === '#/admin-users';
 
@@ -78,7 +82,20 @@ function App() {
                 {isAdminRoute ? (
                   isAdminUsers ? <AdminUsers /> : <AdminDashboard />
                 ) : (
-                  isAuthenticated ? renderStep() : <LoginScreen onLoginSuccess={handleLoginSuccess} />
+                  isAuthenticated ? (
+                    isMyProcesses ? (
+                      <MyProcesses />
+                    ) : (
+                    postLoginChoice === null ? (
+                      <PostLoginMenu
+                        onNew={()=>{ setUserData({}); setStep(2); setPostLoginChoice('new'); }}
+                        onContinue={()=>{ setPostLoginChoice('continue'); (async()=>{ try{ const r=await fetch('/api/me-latest'); const j=await r.json(); if(r.ok && j.ok && j.latest){ const u=j.latest; const pre:any={}; pre.email=u.email; pre.cpf=u.cpf; pre.phone=u.phone; pre.visa_type=u.visa_type; if(Array.isArray(j.countries)&&j.countries.length){ pre.countries=j.countries.map((c:any)=>c.country); } if(Array.isArray(j.social)){ pre.socialMedia=j.social; } setUserData((prev)=>({ ...prev, ...pre })); } }catch{} setStep(2); })(); }}
+                        onTrack={()=>{ window.location.hash = '#/my-processes'; setPostLoginChoice('track'); }}
+                      />
+                    ) : renderStep())
+                  ) : (
+                    <LoginScreen onLoginSuccess={handleLoginSuccess} />
+                  )
                 )}
             </main>
         </div>
