@@ -17,8 +17,19 @@ try {
   $healthResp = Invoke-WebRequest -Uri "$BaseUrl/api/db-health" -TimeoutSec 45 -ErrorAction Stop
   $health = $healthResp.Content
 
-  # 2) Register
-  $regBody = @{ name='E2E QA'; email=$email; password=$pwd } | ConvertTo-Json
+  # 2) Register (generate a valid CPF)
+  function New-ValidCpf() {
+    $seed = [int]($ts % 1000000000)
+    $nine = $seed.ToString().PadLeft(9,'0').Substring(0,9)
+    $sum1 = 0; for ($i=0;$i -lt 9;$i++){ $sum1 += [int]([string]$nine[$i]) * (10-$i) }
+    $d1 = ($sum1 % 11); if ($d1 -lt 2) { $d1 = 0 } else { $d1 = 11 - $d1 }
+    $ten = $nine + $d1
+    $sum2 = 0; for ($i=0;$i -lt 10;$i++){ $sum2 += [int]([string]$ten[$i]) * (11-$i) }
+    $d2 = ($sum2 % 11); if ($d2 -lt 2) { $d2 = 0 } else { $d2 = 11 - $d2 }
+    return ($nine + $d1 + $d2)
+  }
+  $cpf = New-ValidCpf
+  $regBody = @{ name='E2E QA'; email=$email; password=$pwd; cpf=$cpf } | ConvertTo-Json
   $reg = Invoke-WebRequest -Uri "$BaseUrl/api/register" -Method POST -ContentType 'application/json' -Body $regBody -WebSession $session -TimeoutSec 60 -ErrorAction Stop
 
   # 3) Login
@@ -27,7 +38,7 @@ try {
 
   # 4) Save-user (envia x-admin-token se existir para diagnóstico detalhado em caso de erro)
   $saveBody = @{ 
-    cpf='111.222.333-44'; phone='+55 61 99999-0001'; email=$email; visaType='renewal';
+    cpf=$cpf; phone='+55 61 99999-0001'; email=$email; visaType='renewal';
     location=@{ latitude=-15.79; longitude=-47.88 };
     socialMedia=@{ instagram='@e2e.qa'; linkedin='e2e-qa' };
     countries=@('Estados Unidos')
@@ -63,4 +74,3 @@ try {
   Out-Json ([PSCustomObject]@{ ok=$false; error=($_ | Out-String) })
   exit 1
 }
-
