@@ -177,6 +177,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ ok: true, totalUsers, byVisaType, byDay, topCountries, geo });
       }
 
+      if (action === 'purge' && req.method === 'POST') {
+        const body = parseJsonBody(req);
+        const headerConfirm = String((req.headers as any)['x-admin-confirm'] || '').toUpperCase();
+        const bodyConfirm = String(body?.confirm || '').toUpperCase();
+        if (headerConfirm !== 'PURGE' && bodyConfirm !== 'PURGE') {
+          return res.status(400).json({ error: 'Confirmação ausente. Envie {"confirm":"PURGE"} ou header x-admin-confirm: PURGE' });
+        }
+        await conn.beginTransaction();
+        try {
+          await conn.query('SET FOREIGN_KEY_CHECKS=0');
+          await conn.query('TRUNCATE TABLE user_countries');
+          await conn.query('TRUNCATE TABLE user_social_media');
+          await conn.query('TRUNCATE TABLE users');
+          await conn.query('TRUNCATE TABLE auth_accounts');
+          await conn.query('SET FOREIGN_KEY_CHECKS=1');
+          await conn.commit();
+        } catch (e) {
+          try { await conn.rollback(); } catch {}
+          throw e;
+        }
+        return res.status(200).json({ ok: true, purged: true });
+      }
+
       return res.status(400).json({ error: 'Invalid action' });
     } catch (e: any) {
       const dbg = String(req.query.debug || '') === '1';

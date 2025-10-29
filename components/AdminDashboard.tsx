@@ -28,6 +28,7 @@ const AdminDashboard: React.FC = () => {
 
   const [detail, setDetail] = React.useState<any | null>(null);
   const [metrics, setMetrics] = React.useState<any | null>(null);
+  const [purging, setPurging] = React.useState(false);
 
   const check = async () => {
     try { const r = await fetch('/api/admin3?action=me'); const j = await r.json(); setAuthed(!!j.ok); } catch { setAuthed(false); }
@@ -100,6 +101,10 @@ const AdminDashboard: React.FC = () => {
         <h2 className="text-2xl font-bold">Dashboard de Cadastros</h2>
         <div className="flex items-center gap-3">
           <button onClick={refreshAll} className="text-sm text-purple-700 underline">Atualizar</button>
+          <button onClick={async ()=>{
+            if (!window.confirm('Apagar TODOS os cadastros? Esta ação é IRREVERSÍVEL.')) return;
+            try { setPurging(true); const r = await fetch('/api/admin3?action=purge', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ confirm:'PURGE' }) }); if (!r.ok) { const j = await r.json().catch(()=>({})); throw new Error(j?.error||'Falha ao apagar'); } await refreshAll(); alert('Dados apagados.'); } catch (e:any) { alert(e?.message||'Erro'); } finally { setPurging(false); }
+          }} disabled={purging} className="text-sm text-red-700 underline disabled:opacity-50">{purging?'Apagando...':'Apagar tudo'}</button>
           <button onClick={logout} className="text-sm text-red-600 underline">Sair</button>
         </div>
       </div>
