@@ -177,6 +177,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ ok: true, totalUsers, byVisaType, byDay, topCountries, geo });
       }
 
+      if (action === 'user') {
+        const id = Number(req.query.id || 0);
+        if (!id) return res.status(400).json({ error: 'Missing id' });
+        const [uRows]: any = await conn.query(
+          `SELECT u.*, aa.name FROM users u LEFT JOIN auth_accounts aa ON aa.id = u.account_id WHERE u.id = ? LIMIT 1`,
+          [id]
+        );
+        const user = (uRows || [])[0];
+        if (!user) return res.status(404).json({ error: 'Not found' });
+        const [social]: any = await conn.query(`SELECT platform, handle FROM user_social_media WHERE user_id = ? ORDER BY id ASC`, [id]);
+        const [countries]: any = await conn.query(`SELECT country FROM user_countries WHERE user_id = ? ORDER BY id ASC`, [id]);
+        return res.status(200).json({ ok: true, user, social, countries });
+      }
+
       if (action === 'purge' && req.method === 'POST') {
         const body = parseJsonBody(req);
         const headerConfirm = String((req.headers as any)['x-admin-confirm'] || '').toUpperCase();
