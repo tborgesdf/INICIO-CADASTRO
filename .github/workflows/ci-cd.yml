@@ -19,8 +19,14 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install deps
-        run: npm install --no-audit --no-fund
+      - name: Show Node/npm
+        run: |
+          node -v
+          npm -v
+          npm config get cache
+
+      - name: Install deps (omit optional)
+        run: npm install --no-audit --no-fund --omit=optional
 
       - name: Run DB migrations
         env:
