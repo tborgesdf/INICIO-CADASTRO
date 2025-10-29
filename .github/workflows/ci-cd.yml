@@ -28,6 +28,20 @@ jobs:
       - name: Install deps (omit optional)
         run: npm install --no-audit --no-fund --omit=optional
 
+      - name: Trigger Vercel Deploy (Deploy Hook)
+        if: success()
+        run: |
+          if [ -n "${{ secrets.VERCEL_DEPLOY_HOOK }}" ]; then
+            curl -X POST -H "Content-Type: application/json" "${{ secrets.VERCEL_DEPLOY_HOOK }}" || exit 1
+          else
+            echo "No VERCEL_DEPLOY_HOOK set; relying on Vercel GitHub auto-deploy.";
+          fi
+
+      - name: Wait for deployment to propagate
+        run: |
+          echo "Sleeping 40s to allow Vercel deployment to become active..."
+          sleep 40
+
       - name: Run DB migrations (via HTTP)
         env:
           MIGRATE_URL: ${{ secrets.MIGRATE_URL }}
@@ -44,13 +58,4 @@ jobs:
             fi
           else
             echo "MIGRATE_URL/MIGRATE_TOKEN not set; skipping HTTP migration."
-          fi
-
-      - name: Trigger Vercel Deploy (Deploy Hook)
-        if: success()
-        run: |
-          if [ -n "${{ secrets.VERCEL_DEPLOY_HOOK }}" ]; then
-            curl -X POST -H "Content-Type: application/json" "${{ secrets.VERCEL_DEPLOY_HOOK }}" || exit 1
-          else
-            echo "No VERCEL_DEPLOY_HOOK set; relying on Vercel GitHub auto-deploy.";
           fi
