@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import * as crypto from 'crypto';
-import { isAdmin, setAdminCookie, clearAdminCookie } from '../lib/adminAuth';
+import { isAdmin, setAdminCookie, clearAdminCookie } from '../lib/adminAuth2';
 
 export const config = { runtime: 'nodejs' };
 
@@ -47,4 +47,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Internal error', message: e?.message || String(e) });
   }
 }
-
