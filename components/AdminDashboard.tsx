@@ -29,26 +29,26 @@ const AdminDashboard: React.FC = () => {
   const [metrics, setMetrics] = React.useState<any | null>(null);
 
   const check = async () => {
-    try { const r = await fetch('/api/admin/me'); const j = await r.json(); setAuthed(!!j.ok); } catch { setAuthed(false); }
+    try { const r = await fetch('/api/admin?action=me'); const j = await r.json(); setAuthed(!!j.ok); } catch { setAuthed(false); }
   };
   React.useEffect(() => { check(); }, []);
 
   const login = async (e: React.FormEvent) => {
     e.preventDefault(); setError(''); setLoading(true);
     try {
-      const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
+      const r = await fetch('/api/admin?action=login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
       if (!r.ok) { const j = await r.json().catch(()=>({})); throw new Error(j?.error || 'Falha ao autenticar'); }
       setToken(''); await check();
     } catch (err:any) { setError(err?.message || 'Erro'); } finally { setLoading(false); }
   };
 
-  const logout = async () => { await fetch('/api/admin/logout', { method: 'POST' }); setAuthed(false); setRows([]); };
+  const logout = async () => { await fetch('/api/admin?action=logout', { method: 'POST' }); setAuthed(false); setRows([]); };
 
   const load = async () => {
     if (!authed) return;
     const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
     for (const [k,v] of Object.entries(filters)) if (v) qs.set(k, v);
-    const r = await fetch(`/api/admin/users?${qs.toString()}`);
+    const r = await fetch(`/api/admin?action=users&${qs.toString()}`);
     const j = await r.json();
     if (!r.ok || !j.ok) throw new Error(j?.error || 'Falha ao carregar');
     setRows(j.rows || []); setTotal(j.total || 0);
@@ -58,7 +58,7 @@ const AdminDashboard: React.FC = () => {
   const onFilterSubmit = (e: React.FormEvent) => { e.preventDefault(); setPage(1); load().catch(()=>{}); };
 
   const openDetail = async (id: number) => {
-    const r = await fetch(`/api/admin/user?id=${id}`);
+    const r = await fetch(`/api/admin?action=user&id=${id}`);
     const j = await r.json();
     if (!r.ok || !j.ok) return;
     setDetail(j);
@@ -70,7 +70,7 @@ const AdminDashboard: React.FC = () => {
     if (filters.visaType) qs.set('visaType', filters.visaType);
     if (filters.from) qs.set('from', filters.from);
     if (filters.to) qs.set('to', filters.to);
-    const r = await fetch(`/api/admin/metrics?${qs.toString()}`);
+    const r = await fetch(`/api/admin?action=metrics&${qs.toString()}`);
     const j = await r.json();
     if (!r.ok || !j.ok) return;
     setMetrics(j);
