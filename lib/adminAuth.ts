@@ -12,8 +12,9 @@ export function setAdminCookie(res: any) {
   const secret = process.env.JWT_SECRET || 'change-me-dev';
   const now = Math.floor(Date.now()/1000);
   const payload = JSON.stringify({ adm: true, iat: now });
-  const sig = crypto.createHmac('sha256', secret).update(payload).digest('base64');
-  const val = b64url(Buffer.from(payload)) + '.' + b64url(sig);
+  const sigB64 = crypto.createHmac('sha256', secret).update(payload).digest('base64');
+  const sig = sigB64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  const val = b64url(Buffer.from(payload)) + '.' + sig;
   const isProd = process.env.NODE_ENV === 'production';
   const cookie = `${ADMIN_COOKIE}=${encodeURIComponent(val)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${2*60*60}; ${isProd?'Secure':''}`;
   res.setHeader('Set-Cookie', cookie);
@@ -40,4 +41,3 @@ export function isAdmin(req: any): boolean {
     return !!obj.adm;
   } catch { return false; }
 }
-
