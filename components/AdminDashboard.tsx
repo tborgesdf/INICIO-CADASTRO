@@ -24,11 +24,13 @@ const AdminDashboard: React.FC = () => {
   const [pageSize, setPageSize] = React.useState(20);
   const [total, setTotal] = React.useState(0);
   const [rows, setRows] = React.useState<Row[]>([]);
+  const [selected, setSelected] = React.useState<Set<number>>(new Set());
   const [filters, setFilters] = React.useState({ email: '', cpf: '', visaType: '', from: '', to: '' });
 
   const [detail, setDetail] = React.useState<any | null>(null);
   const [metrics, setMetrics] = React.useState<any | null>(null);
   const [purging, setPurging] = React.useState(false);
+  const [edit, setEdit] = React.useState<any | null>(null);
 
   const check = async () => {
     try { const r = await fetch('/api/admin3?action=me'); const j = await r.json(); setAuthed(!!j.ok); } catch { setAuthed(false); }
@@ -64,6 +66,12 @@ const AdminDashboard: React.FC = () => {
     const j = await r.json();
     if (!r.ok || !j.ok) return;
     setDetail(j);
+  };
+
+  const startEdit = async (id: number) => {
+    const r = await fetch(`/api/admin3?action=user&id=${id}`);
+    const j = await r.json(); if (!r.ok || !j.ok) return;
+    setEdit({ id: j.user.id, email: j.user.email || '', cpf: j.user.cpf || '', phone: j.user.phone || '', visa_type: j.user.visa_type || '' });
   };
 
   const loadMetrics = async () => {
@@ -159,6 +167,7 @@ const AdminDashboard: React.FC = () => {
         <table className="min-w-full text-sm">
           <thead className="bg-gray-100">
             <tr>
+              <th className="px-3 py-2"><input type="checkbox" onChange={(e)=>{ const all=new Set<number>(); if (e.target.checked) rows.forEach(r=>all.add(r.id)); setSelected(all); }} checked={selected.size>0 && selected.size===rows.length} /></th>
               <th className="text-left px-3 py-2">ID</th>
               <th className="text-left px-3 py-2">Nome</th>
               <th className="text-left px-3 py-2">E-mail</th>
@@ -172,6 +181,7 @@ const AdminDashboard: React.FC = () => {
           <tbody>
             {rows.map(r => (
               <tr key={r.id} className="border-t">
+                <td className="px-3 py-2"><input type="checkbox" checked={selected.has(r.id)} onChange={(e)=>{ const s=new Set(selected); if(e.target.checked) s.add(r.id); else s.delete(r.id); setSelected(s); }} /></td>
                 <td className="px-3 py-2">{r.id}</td>
                 <td className="px-3 py-2">{r.name || '-'}</td>
                 <td className="px-3 py-2">{r.email}</td>
@@ -179,7 +189,10 @@ const AdminDashboard: React.FC = () => {
                 <td className="px-3 py-2">{r.phone || '-'}</td>
                 <td className="px-3 py-2">{r.visa_type}</td>
                 <td className="px-3 py-2">{new Date(r.created_at).toLocaleString()}</td>
-                <td className="px-3 py-2 text-right"><button onClick={()=>openDetail(r.id)} className="text-purple-700 underline">Ver</button></td>
+                <td className="px-3 py-2 text-right flex gap-3 justify-end">
+                  <button onClick={()=>openDetail(r.id)} className="text-purple-700 underline">Ver</button>
+                  <button onClick={()=>startEdit(r.id)} className="text-blue-700 underline">Editar</button>
+                </td>
               </tr>
             ))}
             {rows.length === 0 && (
@@ -190,7 +203,16 @@ const AdminDashboard: React.FC = () => {
       </div>
 
       <div className="flex items-center justify-between mt-3">
-        <button disabled={page<=1} onClick={()=>setPage(p=>p-1)} className="px-3 py-1 border rounded disabled:opacity-50">Anterior</button>
+        <div className="flex items-center gap-3">
+          <button disabled={page<=1} onClick={()=>setPage(p=>p-1)} className="px-3 py-1 border rounded disabled:opacity-50">Anterior</button>
+          <button disabled={selected.size===0} onClick={async()=>{
+            if (!confirm(`Apagar ${selected.size} registro(s)?`)) return;
+            const ids = Array.from(selected.values());
+            const r = await fetch('/api/admin3?action=deleteMany', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ ids }) });
+            if (!r.ok) { const j = await r.json().catch(()=>({})); alert(j?.error||'Falha ao apagar'); return; }
+            setSelected(new Set()); await refreshAll();
+          }} className="px-3 py-1 border rounded text-red-700 disabled:opacity-50">Apagar selecionados</button>
+        </div>
         <span className="text-sm">Página {page} de {pages}</span>
         <button disabled={page>=pages} onClick={()=>setPage(p=>p+1)} className="px-3 py-1 border rounded disabled:opacity-50">Próxima</button>
       </div>
@@ -230,6 +252,10 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {edit && (
+        <EditModal data={edit} onClose={()=>setEdit(null)} onSaved={()=>{ setEdit(null); refreshAll(); }} />
+      )}
     </div>
   );
 };
@@ -253,6 +279,37 @@ const ChartBars: React.FC<{ data: { day: string; count: number }[]; width: numbe
         return <rect key={i} x={x} y={y} width={bw} height={bh} fill="#7c3aed" />
       })}
     </svg>
+  );
+};
+
+const EditModal: React.FC<{ data: { id:number; email:string; cpf:string; phone:string; visa_type:string }; onClose: ()=>void; onSaved: ()=>void }> = ({ data, onClose, onSaved }) => {
+  const [form, setForm] = React.useState({ ...data }); const [saving, setSaving] = React.useState(false); const [err, setErr] = React.useState('');
+  const change = (k: keyof typeof form) => (e: any) => setForm({ ...form, [k]: e.target.value });
+  const save = async () => {
+    setSaving(true); setErr('');
+    try {
+      const r = await fetch('/api/admin3?action=update', { method: 'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(form) });
+      const j = await r.json().catch(()=>({})); if (!r.ok) throw new Error(j?.error||'Falha ao salvar');
+      onSaved();
+    } catch (e:any) { setErr(e?.message||'Erro'); } finally { setSaving(false); }
+  };
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded shadow-xl max-w-xl w-full p-4" onClick={e=>e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3"><h3 className="text-lg font-semibold">Editar cadastro #{form.id}</h3><button onClick={onClose} className="text-gray-500">Fechar</button></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <label className="block">E‑mail<input className="w-full border rounded px-2 py-1" value={form.email} onChange={change('email')} /></label>
+          <label className="block">CPF<input className="w-full border rounded px-2 py-1" value={form.cpf} onChange={change('cpf')} /></label>
+          <label className="block">Telefone<input className="w-full border rounded px-2 py-1" value={form.phone} onChange={change('phone')} /></label>
+          <label className="block">Tipo de visto<select className="w-full border rounded px-2 py-1" value={form.visa_type} onChange={change('visa_type')}><option value="">(manter)</option><option value="renewal">renovação</option><option value="first_visa">primeiro visto</option></select></label>
+        </div>
+        {err && <p className="text-sm text-red-600 mt-2">{err}</p>}
+        <div className="mt-4 flex justify-end gap-3">
+          <button onClick={onClose} className="px-3 py-1 border rounded">Cancelar</button>
+          <button onClick={save} disabled={saving} className="px-3 py-1 bg-purple-600 text-white rounded disabled:opacity-50">{saving?'Salvando...':'Salvar'}</button>
+        </div>
+      </div>
+    </div>
   );
 };
 

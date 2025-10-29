@@ -200,6 +200,95 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ ok: true, purged: true });
       }
 
+      if (action === 'delete' && req.method === 'POST') {
+        const body = parseJsonBody(req);
+        const id = Number(body?.id || 0);
+        if (!id) return res.status(400).json({ error: 'Missing id' });
+        const [[u]]: any = await conn.query(`SELECT id, account_id FROM users WHERE id = ? LIMIT 1`, [id]);
+        if (!u) return res.status(404).json({ error: 'Not found' });
+        await conn.beginTransaction();
+        try {
+          await conn.query(`DELETE FROM users WHERE id = ?`, [id]);
+          if (u.account_id) {
+            await conn.query(`DELETE FROM auth_accounts WHERE id = ?`, [u.account_id]);
+          }
+          await conn.commit();
+        } catch (e) { try { await conn.rollback(); } catch {}; throw e; }
+        return res.status(200).json({ ok: true, deleted: id });
+      }
+
+      if (action === 'deleteMany' && req.method === 'POST') {
+        const body = parseJsonBody(req);
+        const ids: number[] = Array.isArray(body?.ids) ? body.ids.map((x:any)=>Number(x)).filter((n:number)=>n>0) : [];
+        if (!ids.length) return res.status(400).json({ error: 'Missing ids' });
+        await conn.beginTransaction();
+        try {
+          const [rows]: any = await conn.query(`SELECT id, account_id FROM users WHERE id IN (${ids.map(()=>'?').join(',')})`, ids);
+          const acctIds = (rows || []).map((r:any)=>r.account_id).filter((n:any)=>!!n);
+          if (ids.length) await conn.query(`DELETE FROM users WHERE id IN (${ids.map(()=>'?').join(',')})`, ids);
+          if (acctIds.length) await conn.query(`DELETE FROM auth_accounts WHERE id IN (${acctIds.map(()=>'?').join(',')})`, acctIds);
+          await conn.commit();
+        } catch (e) { try { await conn.rollback(); } catch {}; throw e; }
+        return res.status(200).json({ ok: true, deleted: ids.length });
+      }
+
+      if (action === 'update' && req.method === 'POST') {
+        const body = parseJsonBody(req);
+        const id = Number(body?.id || 0);
+        if (!id) return res.status(400).json({ error: 'Missing id' });
+        const email = (body?.email ?? '').toString().trim();
+        const cpfRaw = (body?.cpf ?? '').toString();
+        const phone = (body?.phone ?? '').toString();
+        const visaType = (body?.visa_type ?? '').toString();
+
+        // helpers de criptografia/índice cego (iguais aos usados nas rotas principais)
+        const getKey = (name: string) => {
+          const v = process.env[name]; if (!v) throw new Error(`Missing ${name}`);
+          const b = Buffer.from(v, 'base64'); if (b.length !== 32) throw new Error(`${name} must be 32 bytes base64`); return b;
+        };
+        const encrypt = (value: string) => {
+          const key = getKey('DATA_ENC_KEY'); const iv = crypto.randomBytes(12);
+          const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+          const ct = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]); const tag = cipher.getAuthTag();
+          return Buffer.concat([iv, tag, ct]).toString('base64');
+        };
+        const blindIndex = (value: string) => {
+          const key = getKey('DATA_HMAC_KEY'); return crypto.createHmac('sha256', key).update(value, 'utf8').digest('hex');
+        };
+        const normalizeCpf = (s: string) => String(s||'').replace(/\D+/g,'');
+        const isValidCpf = (cpf: string) => { const s = normalizeCpf(cpf); if (s.length!==11) return false; if (/^(\d)\1{10}$/.test(s)) return false; const dv=(b:string)=>{let f=b.length+1,sum=0; for(let i=0;i<b.length;i++) sum+=parseInt(b[i],10)*(f-i); const m=sum%11; return m<2?0:11-m;}; return dv(s.substring(0,9))===parseInt(s[9],10)&&dv(s.substring(0,10))===parseInt(s[10],10); };
+
+        const [[u]]: any = await conn.query(`SELECT u.id, u.account_id, aa.email AS account_email FROM users u LEFT JOIN auth_accounts aa ON aa.id=u.account_id WHERE u.id = ? LIMIT 1`, [id]);
+        if (!u) return res.status(404).json({ error: 'Not found' });
+
+        // validações
+        if (email) {
+          const [dups]: any = await conn.query(`SELECT 1 FROM auth_accounts WHERE email = ? AND provider='email' AND id <> ? LIMIT 1`, [email, u.account_id||0]);
+          if ((dups||[]).length) return res.status(409).json({ error: 'E-mail já cadastrado' });
+        }
+        let cpfNorm = cpfRaw ? normalizeCpf(cpfRaw) : '';
+        if (cpfRaw && !isValidCpf(cpfNorm)) return res.status(422).json({ error: 'CPF inválido' });
+        if (cpfNorm) {
+          const [cdups]: any = await conn.query(`SELECT 1 FROM users WHERE (cpf_bidx = ? OR cpf = ?) AND id <> ? LIMIT 1`, [blindIndex(cpfNorm), cpfNorm, id]);
+          if ((cdups||[]).length) return res.status(409).json({ error: 'CPF já cadastrado' });
+        }
+
+        await conn.beginTransaction();
+        try {
+          const updates: string[] = []; const params: any[] = [];
+          if (email) { updates.push('email = ?','email_enc = ?','email_bidx = ?'); params.push(email, encrypt(email), blindIndex(email)); }
+          if (cpfRaw) { updates.push('cpf = ?','cpf_enc = ?','cpf_bidx = ?'); params.push(cpfNorm, encrypt(cpfNorm), blindIndex(cpfNorm)); }
+          if (phone) { updates.push('phone = ?','phone_enc = ?'); params.push(phone, encrypt(phone)); }
+          if (visaType) { updates.push('visa_type = ?'); params.push(visaType); }
+          if (!updates.length) { await conn.rollback(); return res.status(400).json({ error: 'Nenhuma alteração' }); }
+          const sql = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`; params.push(id);
+          await conn.query(sql, params);
+          if (email && u.account_id) { await conn.query(`UPDATE auth_accounts SET email = ? WHERE id = ?`, [email, u.account_id]); }
+          await conn.commit();
+        } catch (e) { try { await conn.rollback(); } catch {}; throw e; }
+        return res.status(200).json({ ok: true });
+      }
+
       return res.status(400).json({ error: 'Invalid action' });
     } catch (e: any) {
       const dbg = String(req.query.debug || '') === '1';
