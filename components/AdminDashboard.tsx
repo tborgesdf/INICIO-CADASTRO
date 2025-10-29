@@ -26,6 +26,7 @@ const AdminDashboard: React.FC = () => {
   const [filters, setFilters] = React.useState({ email: '', cpf: '', visaType: '', from: '', to: '' });
 
   const [detail, setDetail] = React.useState<any | null>(null);
+  const [metrics, setMetrics] = React.useState<any | null>(null);
 
   const check = async () => {
     try { const r = await fetch('/api/admin/me'); const j = await r.json(); setAuthed(!!j.ok); } catch { setAuthed(false); }
@@ -63,6 +64,20 @@ const AdminDashboard: React.FC = () => {
     setDetail(j);
   };
 
+  const loadMetrics = async () => {
+    if (!authed) return;
+    const qs = new URLSearchParams({ days: '30' });
+    if (filters.visaType) qs.set('visaType', filters.visaType);
+    if (filters.from) qs.set('from', filters.from);
+    if (filters.to) qs.set('to', filters.to);
+    const r = await fetch(`/api/admin/metrics?${qs.toString()}`);
+    const j = await r.json();
+    if (!r.ok || !j.ok) return;
+    setMetrics(j);
+  };
+  React.useEffect(() => { if (authed) { loadMetrics().catch(()=>{}); } }, [authed]);
+  const refreshAll = async () => { await Promise.all([load(), loadMetrics()]); };
+
   if (authed === null) return <div>Verificando...</div>;
   if (!authed) return (
     <div>
@@ -81,8 +96,38 @@ const AdminDashboard: React.FC = () => {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-bold">Dashboard de Cadastros</h2>
-        <button onClick={logout} className="text-sm text-red-600 underline">Sair</button>
+        <div className="flex items-center gap-3">
+          <button onClick={refreshAll} className="text-sm text-purple-700 underline">Atualizar</button>
+          <button onClick={logout} className="text-sm text-red-600 underline">Sair</button>
+        </div>
       </div>
+
+      {/* Cards de métricas */}
+      {metrics && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+          <div className="p-3 rounded border bg-white"><div className="text-xs text-gray-500">Total de usuários</div><div className="text-2xl font-semibold">{metrics.totalUsers}</div></div>
+          <div className="p-3 rounded border bg-white"><div className="text-xs text-gray-500">Renovação</div><div className="text-xl">{(metrics.byVisaType||[]).find((x:any)=>x.visaType==='renewal')?.count || 0}</div></div>
+          <div className="p-3 rounded border bg-white"><div className="text-xs text-gray-500">Primeiro visto</div><div className="text-xl">{(metrics.byVisaType||[]).find((x:any)=>x.visaType==='first_visa')?.count || 0}</div></div>
+          <div className="p-3 rounded border bg-white"><div className="text-xs text-gray-500">Países distintos</div><div className="text-xl">{(metrics.topCountries||[]).length}</div></div>
+        </div>
+      )}
+
+      {/* Séries por dia (30 dias) */}
+      {metrics && (
+        <div className="mb-4 p-3 border rounded bg-white">
+          <div className="text-sm font-semibold mb-2">Cadastros por dia (últimos 30 dias)</div>
+          <ChartBars data={(metrics.byDay||[])} width={600} height={140} />
+        </div>
+      )}
+
+      {/* Heatmap simples (lat/lng) */}
+      {metrics && (
+        <div className="mb-4 p-3 border rounded bg-white">
+          <div className="text-sm font-semibold mb-2">Mapa de calor (distribuição geográfica)</div>
+          <HeatmapWorld points={(metrics.geo||[])} width={600} height={300} />
+          <p className="text-xs text-gray-500 mt-1">Representação simplificada (sem tiles); a intensidade reflete clusters aproximados.</p>
+        </div>
+      )}
 
       <form onSubmit={onFilterSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
         <input value={filters.email} onChange={e=>setFilters({...filters, email:e.target.value})} className="border rounded px-2 py-1" placeholder="E-mail" />
@@ -184,3 +229,37 @@ const AdminDashboard: React.FC = () => {
 
 export default AdminDashboard;
 
+// Componentes auxiliares (gráfico de barras e heatmap simplificado)
+const ChartBars: React.FC<{ data: { day: string; count: number }[]; width: number; height: number }> = ({ data, width, height }) => {
+  const pad = 24;
+  const w = width, h = height;
+  const max = Math.max(1, ...data.map(d=>Number(d.count||0)));
+  const bw = Math.max(1, Math.floor((w - pad*2) / Math.max(1, data.length)) - 2);
+  return (
+    <svg width={w} height={h} className="block">
+      <rect x={0} y={0} width={w} height={h} fill="#fafafa"/>
+      {data.map((d,i)=>{
+        const x = pad + i*(bw+2);
+        const val = Number(d.count||0);
+        const bh = Math.round(((h-pad*1.5) * val) / max);
+        const y = h - pad - bh;
+        return <rect key={i} x={x} y={y} width={bw} height={bh} fill="#7c3aed" />
+      })}
+    </svg>
+  );
+};
+
+const HeatmapWorld: React.FC<{ points: { lat: number; lng: number; count: number }[]; width: number; height: number }> = ({ points, width, height }) => {
+  const max = Math.max(1, ...points.map(p=>Number(p.count||0)));
+  return (
+    <div style={{ width, height }} className="relative bg-gradient-to-b from-slate-50 to-slate-100 overflow-hidden border rounded">
+      {points.map((p, i) => {
+        const x = ((Number(p.lng)+180) / 360) * width;
+        const y = ((90 - Number(p.lat)) / 180) * height;
+        const alpha = Math.min(0.9, Math.max(0.1, Number(p.count)/max));
+        const size = 6 + Math.round(14 * (Number(p.count)/max));
+        return <div key={i} style={{ left: x - size/2, top: y - size/2, width: size, height: size, opacity: alpha }} className="absolute rounded-full bg-orange-600 mix-blend-multiply" />
+      })}
+    </div>
+  );
+};
