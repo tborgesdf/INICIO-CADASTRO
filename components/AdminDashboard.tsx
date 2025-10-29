@@ -21,7 +21,7 @@ const AdminDashboard: React.FC = () => {
   const [error, setError] = React.useState('');
 
   const [page, setPage] = React.useState(1);
-  const [pageSize, setPageSize] = React.useState(20);
+  const [pageSize, setPageSize] = React.useState(100);
   const [total, setTotal] = React.useState(0);
   const [rows, setRows] = React.useState<Row[]>([]);
   const [selected, setSelected] = React.useState<Set<number>>(new Set());
@@ -156,7 +156,7 @@ const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      <form onSubmit={onFilterSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
+      <form onSubmit={onFilterSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
         <input value={filters.email} onChange={e=>setFilters({...filters, email:e.target.value})} className="border rounded px-2 py-1" placeholder="E-mail" />
         <input value={filters.cpf} onChange={e=>setFilters({...filters, cpf:e.target.value})} className="border rounded px-2 py-1" placeholder="CPF" />
         <select value={filters.visaType} onChange={e=>setFilters({...filters, visaType:e.target.value})} className="border rounded px-2 py-1">
@@ -170,7 +170,7 @@ const AdminDashboard: React.FC = () => {
           <button type="submit" className="px-4 py-2 bg-orange-500 text-white rounded">Filtrar</button>
           <span className="text-sm text-gray-600">Total: {total}</span>
           <select value={pageSize} onChange={e=>{setPageSize(Number(e.target.value)); setPage(1);}} className="border rounded px-2 py-1">
-            {[10,20,50,100].map(n=> <option key={n} value={n}>{n}/página</option>)}
+            {[20,50,100].map(n=> <option key={n} value={n}>{n}/página</option>)}
           </select>
         </div>
       </form>
@@ -186,6 +186,7 @@ const AdminDashboard: React.FC = () => {
               <th className="text-left px-3 py-2">CPF</th>
               <th className="text-left px-3 py-2">Telefone</th>
               <th className="text-left px-3 py-2">Visto</th>
+              <th className="text-left px-3 py-2">País</th>
               <th className="text-left px-3 py-2">Criado em</th>
               <th className="px-3 py-2"></th>
             </tr>
@@ -200,6 +201,7 @@ const AdminDashboard: React.FC = () => {
                 <td className="px-3 py-2">{r.cpf}</td>
                 <td className="px-3 py-2">{r.phone || '-'}</td>
                 <td className="px-3 py-2">{visaLabel(r.visa_type)}</td>
+                <td className="px-3 py-2">{(r as any).countries ? String((r as any).countries).split(',')[0] : '-'}</td>
                 <td className="px-3 py-2">{fmtBR(r.created_at)}</td>
                 <td className="px-3 py-2 text-right flex gap-3 justify-end">
                   <button onClick={()=>openDetail(r.id)} className="text-purple-700 underline">Ver</button>

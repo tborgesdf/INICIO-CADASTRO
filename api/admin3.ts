@@ -134,12 +134,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const total = (countRows as any)[0]?.total || 0;
         const offset = (page - 1) * pageSize;
         const [rows] = await conn.query<any[]>(
-          `SELECT u.id, u.account_id, u.cpf, u.email, u.phone, u.latitude, u.longitude, u.visa_type, u.created_at, aa.name
-           FROM users u LEFT JOIN auth_accounts aa ON aa.id = u.account_id
+          `SELECT 
+             u.id, u.account_id, u.cpf, u.email, u.phone, u.latitude, u.longitude, u.visa_type, u.created_at, aa.name,
+             (SELECT GROUP_CONCAT(uc.country SEPARATOR ', ') FROM user_countries uc WHERE uc.user_id = u.id) AS countries
+           FROM users u 
+           LEFT JOIN auth_accounts aa ON aa.id = u.account_id
            ${whereSql}
            ORDER BY u.created_at DESC
            LIMIT ? OFFSET ?`, [...params, pageSize, offset]
         );
+        // log de acesso
+        try {
+          await conn.query(`CREATE TABLE IF NOT EXISTS access_logs (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            action VARCHAR(64) NOT NULL,
+            ip VARCHAR(64) NULL,
+            port VARCHAR(16) NULL,
+            method VARCHAR(8) NULL,
+            path TEXT NULL,
+            user_agent TEXT NULL,
+            referer TEXT NULL,
+            country VARCHAR(8) NULL,
+            region VARCHAR(64) NULL,
+            city VARCHAR(64) NULL,
+            latitude VARCHAR(32) NULL,
+            longitude VARCHAR(32) NULL,
+            accept_language VARCHAR(128) NULL,
+            x_forwarded_for TEXT NULL,
+            account_email VARCHAR(255) NULL,
+            PRIMARY KEY (id)
+          ) ENGINE=InnoDB`);
+          const h: any = req.headers || {};
+          await conn.query(
+            `INSERT INTO access_logs (action, ip, port, method, path, user_agent, referer, country, region, city, latitude, longitude, accept_language, x_forwarded_for, account_email)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              'admin_users',
+              (h['x-real-ip'] as string) || (h['x-forwarded-for'] as string) || '',
+              (h['x-vercel-forwarded-for-port'] as string) || '',
+              req.method || '',
+              req.url || '',
+              (h['user-agent'] as string) || '',
+              (h['referer'] as string) || '',
+              (h['x-vercel-ip-country'] as string) || '',
+              (h['x-vercel-ip-country-region'] as string) || '',
+              (h['x-vercel-ip-city'] as string) || '',
+              (h['x-vercel-ip-latitude'] as string) || '',
+              (h['x-vercel-ip-longitude'] as string) || '',
+              (h['accept-language'] as string) || '',
+              (h['x-forwarded-for'] as string) || '',
+              (parseUserSession(req)?.email) || ''
+            ]
+          );
+        } catch {}
         return res.status(200).json({ ok: true, page, pageSize, total, rows });
       }
 
