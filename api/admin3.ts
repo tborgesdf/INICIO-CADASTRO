@@ -18,20 +18,46 @@ function setAdminCookie(res: any) {
 function clearAdminCookie(res: any) {
   res.setHeader('Set-Cookie', `${ADMIN_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`);
 }
+function parseUserSession(req: any): { email: string; accountId: number } | null {
+  try {
+    const cookie: string = req.headers?.cookie || '';
+    const part = cookie.split(';').map((s:string)=>s.trim()).find((s:string)=>s.startsWith('auth_token='));
+    if (!part) return null;
+    const tok = decodeURIComponent(part.split('=')[1]||'');
+    const [h,p,sig] = tok.split('.'); if (!(h && p && sig)) return null;
+    const secret = process.env.JWT_SECRET || 'change-me-dev';
+    const data = `${h}.${p}`;
+    const expected = crypto.createHmac('sha256', secret).update(data).digest('base64')
+      .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    if (expected !== sig) return null;
+    const payloadJson = Buffer.from(p.replace(/-/g,'+').replace(/_/g,'/'),'base64').toString('utf8');
+    const payload = JSON.parse(payloadJson);
+    const now = Math.floor(Date.now()/1000);
+    if (payload.exp && now > payload.exp) return null;
+    return { email: String(payload.email||''), accountId: Number(payload.accountId||0) };
+  } catch { return null; }
+}
+
 function isAdmin(req: any): boolean {
   try {
     const cookie: string = req.headers?.cookie || '';
     const part = cookie.split(';').map((s:string)=>s.trim()).find((s:string)=>s.startsWith(`${ADMIN_COOKIE}=`));
-    if (!part) return false;
-    const val = decodeURIComponent(part.split('=')[1]||'');
-    const [p,s] = val.split('.'); if (!(p && s)) return false;
-    const payload = Buffer.from(p.replace(/-/g,'+').replace(/_/g,'/'),'base64').toString('utf8');
-    const secret = process.env.JWT_SECRET || 'change-me-dev';
-    const sig = crypto.createHmac('sha256', secret).update(payload).digest('base64')
-      .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-    if (sig !== s) return false;
-    const obj = JSON.parse(payload);
-    return !!(obj && obj.adm);
+    if (part) {
+      const val = decodeURIComponent(part.split('=')[1]||'');
+      const [p,s] = val.split('.'); if (!(p && s)) return false;
+      const payload = Buffer.from(p.replace(/-/g,'+').replace(/_/g,'/'),'base64').toString('utf8');
+      const secret = process.env.JWT_SECRET || 'change-me-dev';
+      const sig = crypto.createHmac('sha256', secret).update(payload).digest('base64')
+        .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+      if (sig === s) { const obj = JSON.parse(payload); if (obj && obj.adm) return true; }
+    }
+    // Fallback: sessão do usuário comum, validada e em allowlist de admins
+    const allow = String(process.env.ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+    if (allow.length) {
+      const sess = parseUserSession(req);
+      if (sess && allow.includes(String(sess.email||'').toLowerCase())) return true;
+    }
+    return false;
   } catch { return false; }
 }
 
