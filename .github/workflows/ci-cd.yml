@@ -34,7 +34,14 @@ jobs:
           MIGRATE_TOKEN: ${{ secrets.MIGRATE_TOKEN }}
         run: |
           if [ -n "$MIGRATE_URL" ] && [ -n "$MIGRATE_TOKEN" ]; then
-            curl -sS -X POST -H "x-admin-token: $MIGRATE_TOKEN" "$MIGRATE_URL" -f
+            echo "Calling migration endpoint: $MIGRATE_URL"
+            http_code=$(curl -sS -o /tmp/migrate_resp.json -w "%{http_code}" -X POST -H "x-admin-token: $MIGRATE_TOKEN" "$MIGRATE_URL?debug=1")
+            echo "Response ($http_code):"; cat /tmp/migrate_resp.json || true
+            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+              echo "Migration OK"
+            else
+              echo "Migration failed with HTTP $http_code" >&2; exit 1
+            fi
           else
             echo "MIGRATE_URL/MIGRATE_TOKEN not set; skipping HTTP migration."
           fi
