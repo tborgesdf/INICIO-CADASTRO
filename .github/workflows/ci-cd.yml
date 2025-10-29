@@ -28,13 +28,19 @@ jobs:
       - name: Install deps (omit optional)
         run: npm install --no-audit --no-fund --omit=optional
 
-      - name: Run DB migrations
+      - name: Run DB migrations (direct)
+        if: ${{ secrets.DB_HOST != '' && secrets.DB_USER != '' && secrets.DB_PASSWORD != '' && secrets.DB_NAME != '' }}
         env:
           DB_HOST: ${{ secrets.DB_HOST }}
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           DB_NAME: ${{ secrets.DB_NAME }}
         run: node scripts/migrate.cjs
+
+      - name: Run DB migrations (via HTTP)
+        if: ${{ secrets.MIGRATE_URL != '' && secrets.MIGRATE_TOKEN != '' }}
+        run: |
+          curl -sS -X POST -H "x-admin-token: ${{ secrets.MIGRATE_TOKEN }}" "$${{ secrets.MIGRATE_URL }}" -f
 
       - name: Trigger Vercel Deploy (Deploy Hook)
         if: success()
