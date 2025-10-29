@@ -28,19 +28,6 @@ jobs:
       - name: Install deps (omit optional)
         run: npm install --no-audit --no-fund --omit=optional
 
-      - name: Run DB migrations (direct)
-        env:
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_NAME: ${{ secrets.DB_NAME }}
-        run: |
-          if [ -n "$DB_HOST" ] && [ -n "$DB_USER" ] && [ -n "$DB_PASSWORD" ] && [ -n "$DB_NAME" ]; then
-            node scripts/migrate.cjs
-          else
-            echo "DB secrets missing; skipping direct migration."
-          fi
-
       - name: Run DB migrations (via HTTP)
         env:
           MIGRATE_URL: ${{ secrets.MIGRATE_URL }}
