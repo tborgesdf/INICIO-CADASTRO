@@ -103,6 +103,18 @@ const AdminDashboard: React.FC = () => {
 
   const pages = Math.max(1, Math.ceil(total / pageSize));
 
+  const visaLabel = (v?: string) => v === 'renewal' ? 'Renovação' : v === 'first_visa' ? 'Primeiro visto' : (v || '-');
+  const fmtBR = (value: any) => {
+    try {
+      const d = new Date(value);
+      return new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+      }).format(d);
+    } catch { return String(value||''); }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -187,8 +199,8 @@ const AdminDashboard: React.FC = () => {
                 <td className="px-3 py-2">{r.email}</td>
                 <td className="px-3 py-2">{r.cpf}</td>
                 <td className="px-3 py-2">{r.phone || '-'}</td>
-                <td className="px-3 py-2">{r.visa_type}</td>
-                <td className="px-3 py-2">{new Date(r.created_at).toLocaleString()}</td>
+                <td className="px-3 py-2">{visaLabel(r.visa_type)}</td>
+                <td className="px-3 py-2">{fmtBR(r.created_at)}</td>
                 <td className="px-3 py-2 text-right flex gap-3 justify-end">
                   <button onClick={()=>openDetail(r.id)} className="text-purple-700 underline">Ver</button>
                   <button onClick={()=>startEdit(r.id)} className="text-blue-700 underline">Editar</button>
@@ -229,9 +241,9 @@ const AdminDashboard: React.FC = () => {
               <div><strong>E-mail:</strong> {detail.user?.email}</div>
               <div><strong>CPF:</strong> {detail.user?.cpf}</div>
               <div><strong>Telefone:</strong> {detail.user?.phone || '-'}</div>
-              <div><strong>Tipo de visto:</strong> {detail.user?.visa_type}</div>
+              <div><strong>Tipo de visto:</strong> {visaLabel(detail.user?.visa_type)}</div>
               <div><strong>Coordenadas:</strong> {detail.user?.latitude},{detail.user?.longitude}</div>
-              <div className="md:col-span-2"><strong>Criado em:</strong> {new Date(detail.user?.created_at).toLocaleString()}</div>
+              <div className="md:col-span-2"><strong>Criado em:</strong> {fmtBR(detail.user?.created_at)}</div>
             </div>
             <div className="mt-3">
               <h4 className="font-semibold mb-1">Redes sociais</h4>
