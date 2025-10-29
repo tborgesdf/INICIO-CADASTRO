@@ -36,12 +36,13 @@ const SocialMediaScreen: React.FC<SocialMediaScreenProps> = ({ onNext, userData,
     setSocials(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const finalUserData = {
       ...userData,
       socialMedia: noSocials ? {} : socials,
     };
     
+    try { await fetch('/api/save-draft', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ socialMedia: finalUserData.socialMedia }) }); } catch {}
     setUserData(finalUserData);
     onNext();
   };

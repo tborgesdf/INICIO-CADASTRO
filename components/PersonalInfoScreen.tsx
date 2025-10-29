@@ -103,12 +103,13 @@ const PersonalInfoScreen: React.FC<PersonalInfoScreenProps> = ({ onNext, userDat
     setIsFormValid(allFieldsFilled && noErrors);
   }, [formData, errors]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isFormValid) {
-      setUserData(prev => ({ ...prev, ...formData }));
-      onNext();
-    }
+    if (!isFormValid) return;
+    const payload = { cpf: formData.cpf, phone: formData.phone, email: formData.email };
+    try { await fetch('/api/save-draft', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(payload) }); } catch {}
+    setUserData(prev => ({ ...prev, ...formData }));
+    onNext();
   };
 
   const createBlob = (data: Float32Array): Blob => {

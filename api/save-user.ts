@@ -111,18 +111,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const cpfBidx = cpf ? blindIndex(cpfNorm) : null;
       const emailBidx = email ? blindIndex(String(email)) : null;
 
-      const [userResult] = await conn.execute<import('mysql2').ResultSetHeader>(
-        `INSERT INTO users (account_id, cpf, phone, email, cpf_enc, phone_enc, email_enc, cpf_bidx, email_bidx, latitude, longitude, visa_type)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [accountId, cpf ?? null, phone ?? null, email ?? null, encCpf, encPhone, encEmail, cpfBidx, emailBidx, lat, lng, visaType]
-      );
-
-      const userId = (userResult as any).insertId as number;
+      // Reaproveitar rascunho existente, senão criar novo
+      let userId: number | null = null;
+      if (accountId) {
+        const [rows]: any = await conn.query(`SELECT id FROM users WHERE account_id=? AND status='in_progress' ORDER BY created_at DESC LIMIT 1`, [accountId]);
+        userId = (rows||[])[0]?.id || null;
+      }
+      if (userId) {
+        await conn.execute(
+          `UPDATE users SET cpf=?, phone=?, email=?, cpf_enc=?, phone_enc=?, email_enc=?, cpf_bidx=?, email_bidx=?, latitude=?, longitude=?, visa_type=?, status='submitted' WHERE id=?`,
+          [cpf ?? null, phone ?? null, email ?? null, encCpf, encPhone, encEmail, cpfBidx, emailBidx, lat, lng, visaType, userId]
+        );
+      } else {
+        const [userResult] = await conn.execute<import('mysql2').ResultSetHeader>(
+          `INSERT INTO users (account_id, cpf, phone, email, cpf_enc, phone_enc, email_enc, cpf_bidx, email_bidx, latitude, longitude, visa_type, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'submitted')`,
+          [accountId, cpf ?? null, phone ?? null, email ?? null, encCpf, encPhone, encEmail, cpfBidx, emailBidx, lat, lng, visaType]
+        );
+        userId = (userResult as any).insertId as number;
+      }
 
       // Social media (key/value pairs)
-      if (socialMedia && typeof socialMedia === 'object') {
+      if (userId && socialMedia && typeof socialMedia === 'object') {
         const entries = Object.entries(socialMedia).filter(([, v]) => !!v);
         if (entries.length) {
+          await conn.execute(`DELETE FROM user_social_media WHERE user_id=?`, [userId]);
           const values: any[] = [];
           const placeholders: string[] = [];
           for (const [platform, handle] of entries) {
@@ -137,7 +150,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // Countries
-      if (Array.isArray(countries) && countries.length) {
+      if (userId && Array.isArray(countries) && countries.length) {
+        await conn.execute(`DELETE FROM user_countries WHERE user_id=?`, [userId]);
         const values: any[] = [];
         const placeholders: string[] = [];
         for (const country of countries) {

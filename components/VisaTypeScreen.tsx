@@ -40,6 +40,8 @@ const VisaTypeScreen: React.FC<VisaTypeScreenProps> = ({ onNext, userData, setUs
     setUserData(finalUserData);
 
     try {
+      // salvar rascunho antes de enviar
+      try { await fetch('/api/save-draft', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ visaType, countries: selectedCountries }) }); } catch {}
       await databaseService.saveUserData(finalUserData);
       console.log('User data saved successfully:', finalUserData);
       onNext();
