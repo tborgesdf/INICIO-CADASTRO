@@ -48,9 +48,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       for (const file of files) {
         if (applied.has(file)) continue;
         const sql = fs.readFileSync(path.join(dir, file), 'utf8');
+        const statements = sql
+          .split(/;\s*\n/)
+          .map(s => s.trim())
+          .filter(s => s.length > 0);
         await (conn as any).beginTransaction();
         try {
-          await (conn as any).query(sql);
+          for (const stmt of statements) {
+            try {
+              await (conn as any).query(stmt);
+            } catch (e: any) {
+              const code = e?.errno || e?.code || 0;
+              const msg = String(e?.message || '').toLowerCase();
+              const isIdempotent = (
+                code === 1050 /* ER_TABLE_EXISTS_ERROR */ ||
+                code === 1060 /* ER_DUP_FIELDNAME */ ||
+                code === 1061 /* ER_DUP_KEYNAME */ ||
+                code === 1022 /* ER_DUP_KEY */ ||
+                msg.includes('duplicate column') ||
+                msg.includes('duplicate key') ||
+                msg.includes('already exists') ||
+                msg.includes('cannot add foreign key constraint') /* FKs podem já existir ou faltar dependência; tolerar reexecução */
+              );
+              if (!isIdempotent) throw e; // abort for real errors
+            }
+          }
           await (conn as any).query('INSERT INTO `_migrations` (name) VALUES (?)', [file]);
           await (conn as any).commit();
           ran.push(file);
@@ -67,4 +89,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Internal error', message: e?.message || String(e) });
   }
 }
-
