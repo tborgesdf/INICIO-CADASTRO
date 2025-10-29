@@ -100,6 +100,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action === 'me') {
       return res.status(200).json({ ok: isAdmin(req) });
     }
+    if (action === 'whoami') {
+      const session = parseUserSession(req);
+      const sessionEmail = (session?.email || '').toLowerCase();
+      const allowList = String(process.env.ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+      const isSuper = !!(sessionEmail && allowList.includes(sessionEmail));
+      let perms: any = { isSuper, can_manage_users: isSuper, can_view_all: isSuper, can_edit_all: isSuper, view_fields: [], edit_fields: [] };
+      if (!isSuper && sessionEmail) {
+        try {
+          const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME } = process.env as Record<string, string | undefined>;
+          if (DB_HOST && DB_USER && DB_PASSWORD && DB_NAME) {
+            const c = await mysql.createConnection({ host: DB_HOST, user: DB_USER, password: DB_PASSWORD, database: DB_NAME });
+            try {
+              const [rows]: any = await c.query(`SELECT can_manage_users, can_view_all, can_edit_all, view_fields, edit_fields FROM admin_users WHERE email=? AND is_active=1 LIMIT 1`, [sessionEmail]);
+              if ((rows||[])[0]) {
+                const u = rows[0];
+                perms.can_manage_users = !!u.can_manage_users;
+                perms.can_view_all = !!u.can_view_all;
+                perms.can_edit_all = !!u.can_edit_all;
+                perms.view_fields = u.view_fields ? JSON.parse(u.view_fields) : [];
+                perms.edit_fields = u.edit_fields ? JSON.parse(u.edit_fields) : [];
+              }
+            } finally { await c.end().catch(()=>{}); }
+          }
+        } catch {}
+      }
+      return res.status(200).json({ ok: true, perms });
+    }
 
     // As rotas abaixo exigem sessão admin válida
     if (!isAdmin(req)) return res.status(401).json({ error: 'Unauthorized' });
@@ -110,8 +137,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'Missing DB env vars' });
     }
 
-    const conn = await mysql.createConnection({ host: DB_HOST, user: DB_USER, password: DB_PASSWORD, database: DB_NAME });
+    const conn = await mysql.createConnection({ host: DB_HOST, user: DB_USER, password: DB_PASSWORD, database: DB_NAME, multipleStatements: true });
     try {
+      // ensure admin_users table exists (for RBAC básico)
+      await conn.query(`CREATE TABLE IF NOT EXISTS admin_users (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        name VARCHAR(255) NULL,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        cpf VARCHAR(32) NULL,
+        birth_date DATE NULL,
+        phone VARCHAR(32) NULL,
+        photo LONGBLOB NULL,
+        role VARCHAR(32) NULL,
+        can_manage_users TINYINT(1) NOT NULL DEFAULT 0,
+        can_view_all TINYINT(1) NOT NULL DEFAULT 1,
+        can_edit_all TINYINT(1) NOT NULL DEFAULT 0,
+        view_fields JSON NULL,
+        edit_fields JSON NULL,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id)
+      ) ENGINE=InnoDB`);
+
+      const session = parseUserSession(req);
+      const sessionEmail = (session?.email || '').toLowerCase();
+      const allowList = String(process.env.ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+      const isSuper = !!(sessionEmail && allowList.includes(sessionEmail));
+      let isDbAdmin = false;
+      if (sessionEmail && !isSuper) {
+        const [adm]: any = await conn.query(`SELECT id FROM admin_users WHERE email = ? AND is_active = 1 LIMIT 1`, [sessionEmail]);
+        isDbAdmin = (adm||[]).length>0;
+      }
+      const hasAdmin = isSuper || isDbAdmin || isAdmin(req);
+      if (!hasAdmin) return res.status(401).json({ error: 'Unauthorized' });
       if (action === 'users') {
         const page = Math.max(1, Number(req.query.page || 1));
         const pageSize = Math.max(1, Math.min(100, Number(req.query.pageSize || 20)));
@@ -348,6 +406,74 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (email && u.account_id) { await conn.query(`UPDATE auth_accounts SET email = ? WHERE id = ?`, [email, u.account_id]); }
           await conn.commit();
         } catch (e) { try { await conn.rollback(); } catch {}; throw e; }
+        return res.status(200).json({ ok: true });
+      }
+
+      // Administração de usuários do sistema (apenas super ou can_manage_users)
+      if (action === 'adminUsersList') {
+        if (!isSuper) {
+          const [me]: any = await conn.query(`SELECT can_manage_users FROM admin_users WHERE email=? LIMIT 1`, [sessionEmail]);
+          if (!(me||[])[0]?.can_manage_users) return res.status(403).json({ error: 'Forbidden' });
+        }
+        const [rows]: any = await conn.query(`SELECT id,name,email,cpf,birth_date,phone,role,can_manage_users,can_view_all,can_edit_all,is_active,created_at FROM admin_users ORDER BY created_at DESC`);
+        return res.status(200).json({ ok: true, rows });
+      }
+      if (action === 'adminUsersGet') {
+        const id = Number(req.query.id || 0); if (!id) return res.status(400).json({ error: 'Missing id' });
+        const [rows]: any = await conn.query(`SELECT id,name,email,cpf,birth_date,phone,role,can_manage_users,can_view_all,can_edit_all,view_fields,edit_fields,is_active FROM admin_users WHERE id=? LIMIT 1`, [id]);
+        const user = (rows||[])[0]; if (!user) return res.status(404).json({ error: 'Not found' });
+        return res.status(200).json({ ok: true, user });
+      }
+      if (action === 'adminUsersUpsert' && req.method === 'POST') {
+        if (!isSuper) {
+          const [me]: any = await conn.query(`SELECT can_manage_users FROM admin_users WHERE email=? LIMIT 1`, [sessionEmail]);
+          if (!(me||[])[0]?.can_manage_users) return res.status(403).json({ error: 'Forbidden' });
+        }
+        const body = parseJsonBody(req);
+        const id = Number(body?.id || 0);
+        const name = String(body?.name||'');
+        const email = String(body?.email||'').toLowerCase();
+        const cpf = String(body?.cpf||'');
+        const birth_date = String(body?.birth_date||'') || null;
+        const phone = String(body?.phone||'');
+        const role = String(body?.role||'admin');
+        const can_manage_users = body?.can_manage_users ? 1:0;
+        const can_view_all = body?.can_view_all ? 1:0;
+        const can_edit_all = body?.can_edit_all ? 1:0;
+        const view_fields = body?.view_fields ? JSON.stringify(body.view_fields) : null;
+        const edit_fields = body?.edit_fields ? JSON.stringify(body.edit_fields) : null;
+        const is_active = body?.is_active ? 1:0;
+        // foto base64 opcional
+        let photoBuf: Buffer|null = null;
+        if (body?.photo && typeof body.photo === 'string') {
+          const s: string = body.photo;
+          const b64 = s.startsWith('data:') ? s.substring(s.indexOf(',')+1) : s;
+          try { photoBuf = Buffer.from(b64, 'base64'); } catch {}
+        }
+        if (!email) return res.status(400).json({ error: 'E-mail obrigatório' });
+        if (id) {
+          const params: any[] = [name,email,cpf,birth_date,phone,role,can_manage_users,can_view_all,can_edit_all,view_fields,edit_fields,is_active];
+          let sql = `UPDATE admin_users SET name=?, email=?, cpf=?, birth_date=?, phone=?, role=?, can_manage_users=?, can_view_all=?, can_edit_all=?, view_fields=?, edit_fields=?, is_active=?`;
+          if (photoBuf) { sql += `, photo=?`; params.push(photoBuf); }
+          sql += ` WHERE id=?`; params.push(id);
+          await conn.query(sql, params);
+          return res.status(200).json({ ok: true, id });
+        } else {
+          const [dups]: any = await conn.query(`SELECT 1 FROM admin_users WHERE email=? LIMIT 1`, [email]);
+          if ((dups||[]).length) return res.status(409).json({ error: 'E-mail já cadastrado' });
+          const [r]: any = await conn.query(`INSERT INTO admin_users (name,email,cpf,birth_date,phone,photo,role,can_manage_users,can_view_all,can_edit_all,view_fields,edit_fields,is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            [name,email,cpf,birth_date,phone,photoBuf,role,can_manage_users,can_view_all,can_edit_all,view_fields,edit_fields,1]);
+          return res.status(200).json({ ok: true, id: r.insertId });
+        }
+      }
+      if (action === 'adminUsersDelete' && req.method === 'POST') {
+        if (!isSuper) {
+          const [me]: any = await conn.query(`SELECT can_manage_users FROM admin_users WHERE email=? LIMIT 1`, [sessionEmail]);
+          if (!(me||[])[0]?.can_manage_users) return res.status(403).json({ error: 'Forbidden' });
+        }
+        const body = parseJsonBody(req);
+        const id = Number(body?.id || 0); if (!id) return res.status(400).json({ error: 'Missing id' });
+        await conn.query(`DELETE FROM admin_users WHERE id=?`, [id]);
         return res.status(200).json({ ok: true });
       }
 

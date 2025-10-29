@@ -95,7 +95,18 @@ const AdminUsers: React.FC = () => {
     <div>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg font-semibold">Usuários do Sistema</h3>
-        <button onClick={openNew} className="px-3 py-1 bg-purple-600 text-white rounded">Novo usuário</button>
+        <div className="flex items-center gap-2">
+          <button onClick={()=>{
+            // exportar CSV
+            const cols = ['id','name','email','cpf','birth_date','phone','role','can_manage_users','can_view_all','can_edit_all','is_active'];
+            const header = cols.join(',');
+            const lines = rows.map((r:any)=> cols.map(c=>`"${String(r[c]??'').replace(/"/g,'""')}"`).join(','));
+            const csv = [header, ...lines].join('\n');
+            const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' }); const url=URL.createObjectURL(blob);
+            const a=document.createElement('a'); a.href=url; a.download='usuarios-sistema.csv'; a.click(); URL.revokeObjectURL(url);
+          }} className="px-3 py-1 border rounded">Exportar CSV</button>
+          <button onClick={openNew} className="px-3 py-1 bg-purple-600 text-white rounded">Novo usuário</button>
+        </div>
       </div>
       {loading && <p className="text-sm text-gray-500">Carregando...</p>}
       {err && <p className="text-sm text-red-600">{err}</p>}

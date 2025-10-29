@@ -31,6 +31,7 @@ const AdminDashboard: React.FC = () => {
   const [metrics, setMetrics] = React.useState<any | null>(null);
   const [purging, setPurging] = React.useState(false);
   const [edit, setEdit] = React.useState<any | null>(null);
+  const [perms, setPerms] = React.useState<{ isSuper:boolean; can_manage_users:boolean; can_view_all:boolean; can_edit_all:boolean; view_fields:string[]; edit_fields:string[] }>({ isSuper:false, can_manage_users:false, can_view_all:true, can_edit_all:false, view_fields:[], edit_fields:[] });
 
   const check = async () => {
     try { const r = await fetch('/api/admin3?action=me'); const j = await r.json(); setAuthed(!!j.ok); } catch { setAuthed(false); }
@@ -86,7 +87,21 @@ const AdminDashboard: React.FC = () => {
     setMetrics(j);
   };
   React.useEffect(() => { if (authed) { loadMetrics().catch(()=>{}); } }, [authed]);
+  React.useEffect(() => { if (authed) { (async()=>{ try{ const r=await fetch('/api/admin3?action=whoami'); const j=await r.json(); if(r.ok && j.ok && j.perms){ setPerms(j.perms); } }catch{} })(); } }, [authed]);
   const refreshAll = async () => { await Promise.all([load(), loadMetrics()]); };
+
+  const canView = (field: string) => perms.can_view_all || perms.view_fields.includes(field);
+  const canEdit = (field: string) => perms.can_edit_all || perms.edit_fields.includes(field);
+  const someEditable = ['email','cpf','phone','visa_type'].some(canEdit);
+
+  const exportCsv = () => {
+    const cols = ['id'].concat(['name','email','cpf','phone','visa_type','countries'].filter(canView)).concat(['created_at']);
+    const header = cols.join(',');
+    const lines = rows.map((r:any)=> cols.map(c=>`"${String(r[c] ?? (c==='countries'?(r.countries||''):'' )).replace(/"/g,'""')}"`).join(',') );
+    const csv = [header, ...lines].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='cadastros.csv'; a.click(); URL.revokeObjectURL(url);
+  };
 
   if (authed === null) return <div>Verificando...</div>;
   if (!authed) return (
@@ -120,6 +135,8 @@ const AdminDashboard: React.FC = () => {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-bold">Dashboard de Cadastros</h2>
         <div className="flex items-center gap-3">
+          <button onClick={()=>{ try { window.location.hash = '#/admin-users'; } catch {} }} className="text-sm bg-purple-600 text-white px-3 py-1 rounded">ADD Usuário</button>
+          <button onClick={exportCsv} className="text-sm text-purple-700 underline">Exportar CSV</button>
           <button onClick={refreshAll} className="text-sm text-purple-700 underline">Atualizar</button>
           <button onClick={async ()=>{
             if (!window.confirm('Apagar TODOS os cadastros? Esta ação é IRREVERSÍVEL.')) return;
@@ -181,12 +198,12 @@ const AdminDashboard: React.FC = () => {
             <tr>
               <th className="px-3 py-2"><input type="checkbox" onChange={(e)=>{ const all=new Set<number>(); if (e.target.checked) rows.forEach(r=>all.add(r.id)); setSelected(all); }} checked={selected.size>0 && selected.size===rows.length} /></th>
               <th className="text-left px-3 py-2">ID</th>
-              <th className="text-left px-3 py-2">Nome</th>
-              <th className="text-left px-3 py-2">E-mail</th>
-              <th className="text-left px-3 py-2">CPF</th>
-              <th className="text-left px-3 py-2">Telefone</th>
-              <th className="text-left px-3 py-2">Visto</th>
-              <th className="text-left px-3 py-2">País</th>
+              {canView('name') && <th className="text-left px-3 py-2">Nome</th>}
+              {canView('email') && <th className="text-left px-3 py-2">E-mail</th>}
+              {canView('cpf') && <th className="text-left px-3 py-2">CPF</th>}
+              {canView('phone') && <th className="text-left px-3 py-2">Telefone</th>}
+              {canView('visa_type') && <th className="text-left px-3 py-2">Visto</th>}
+              {canView('countries') && <th className="text-left px-3 py-2">País</th>}
               <th className="text-left px-3 py-2">Criado em</th>
               <th className="px-3 py-2"></th>
             </tr>
@@ -196,16 +213,16 @@ const AdminDashboard: React.FC = () => {
               <tr key={r.id} className="border-t">
                 <td className="px-3 py-2"><input type="checkbox" checked={selected.has(r.id)} onChange={(e)=>{ const s=new Set(selected); if(e.target.checked) s.add(r.id); else s.delete(r.id); setSelected(s); }} /></td>
                 <td className="px-3 py-2">{r.id}</td>
-                <td className="px-3 py-2">{r.name || '-'}</td>
-                <td className="px-3 py-2">{r.email}</td>
-                <td className="px-3 py-2">{r.cpf}</td>
-                <td className="px-3 py-2">{r.phone || '-'}</td>
-                <td className="px-3 py-2">{visaLabel(r.visa_type)}</td>
-                <td className="px-3 py-2">{(r as any).countries ? String((r as any).countries).split(',')[0] : '-'}</td>
+                {canView('name') && <td className="px-3 py-2">{r.name || '-'}</td>}
+                {canView('email') && <td className="px-3 py-2">{r.email}</td>}
+                {canView('cpf') && <td className="px-3 py-2">{r.cpf}</td>}
+                {canView('phone') && <td className="px-3 py-2">{r.phone || '-'}</td>}
+                {canView('visa_type') && <td className="px-3 py-2">{visaLabel(r.visa_type)}</td>}
+                {canView('countries') && <td className="px-3 py-2">{(r as any).countries ? String((r as any).countries).split(',')[0] : '-'}</td>}
                 <td className="px-3 py-2">{fmtBR(r.created_at)}</td>
                 <td className="px-3 py-2 text-right flex gap-3 justify-end">
                   <button onClick={()=>openDetail(r.id)} className="text-purple-700 underline">Ver</button>
-                  <button onClick={()=>startEdit(r.id)} className="text-blue-700 underline">Editar</button>
+                  {(someEditable) && <button onClick={()=>startEdit(r.id)} className="text-blue-700 underline">Editar</button>}
                 </td>
               </tr>
             ))}
