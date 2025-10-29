@@ -1,7 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import mysql from 'mysql2/promise';
 import * as crypto from 'crypto';
-import bcrypt from 'bcryptjs';
 import { isAdmin, setAdminCookie, clearAdminCookie } from '../lib/adminAuth';
 
 export const config = { runtime: 'nodejs' };
@@ -31,22 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const password = String(body?.password || '');
       const allow = String(process.env.ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
       if (!allow.length) return res.status(500).json({ error: 'ADMIN_EMAILS ausente' });
-      if (!email || !allow.includes(email)) return res.status(401).json({ error: 'N√£o autorizado' });
-      const hash = process.env.ADMIN_PASSWORD_HASH || '';
-      const plain = process.env.ADMIN_PASSWORD || '';
-      let ok = false;
-      if (hash) {
-        try { ok = await bcrypt.compare(password, hash); } catch { ok = false; }
-      } else if (plain) {
-        const a = Buffer.from(password);
-        const b = Buffer.from(plain);
-        ok = a.length === b.length && crypto.timingSafeEqual(a, b);
-      } else {
-        return res.status(500).json({ error: 'ADMIN_PASSWORD_HASH/ADMIN_PASSWORD ausente' });
-      }
-      if (!ok) return res.status(401).json({ error: 'Credenciais inv√°lidas' });
-      setAdminCookie(res);
-      return res.status(200).json({ ok: true });
+      if (!email || !allow.includes(email)) return res.status(401).json({ error: 'N√£o autorizado' });\n      if (!email || !allow.includes(email)) return res.status(401).json({ error: 'N„o autorizado' });\n      const plain = process.env.ADMIN_PASSWORD || '';\n      if (!plain) return res.status(500).json({ error: 'ADMIN_PASSWORD ausente' });\n      {\n        const a = Buffer.from(password);\n        const b = Buffer.from(plain);\n        const ok = a.length === b.length && crypto.timingSafeEqual(a, b);\n        if (!ok) return res.status(401).json({ error: 'Credenciais inv·lidas' });\n      }\n      setAdminCookie(res);\n      return res.status(200).json({ ok: true });
     }
 
     // logout (POST)
@@ -159,3 +143,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Internal error', message: e?.message || String(e) });
   }
 }
+
+
