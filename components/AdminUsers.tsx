@@ -128,8 +128,8 @@ const AdminUsers: React.FC = () => {
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4" onClick={()=>setModalOpen(false)}>
-          <div className="bg-white rounded shadow-xl max-w-2xl w-full p-4" onClick={e=>e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={()=>setModalOpen(false)}>
+          <div className="bg-white rounded shadow-xl w-full max-w-4xl p-4 md:p-6 max-h-[85vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-lg font-semibold">{form.id? 'Editar usuário':'Novo usuário'}</h4>
               <button onClick={()=>setModalOpen(false)} className="text-gray-500">Fechar</button>

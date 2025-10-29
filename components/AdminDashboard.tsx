@@ -232,8 +232,8 @@ const AdminDashboard: React.FC = () => {
       </div>
 
       {detail && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4" onClick={()=>setDetail(null)}>
-          <div className="bg-white rounded shadow-xl max-w-2xl w-full p-4" onClick={e=>e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={()=>setDetail(null)}>
+          <div className="bg-white rounded shadow-xl w-full max-w-3xl p-4 md:p-6 max-h-[85vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-semibold">Detalhes do Usuário #{detail.user?.id}</h3>
               <button onClick={()=>setDetail(null)} className="text-gray-500">Fechar</button>

@@ -64,15 +64,16 @@ function App() {
   };
 
   const isAdminRoute = typeof window !== 'undefined' && (window.location.hash === '#/admin' || window.location.hash === '#/admin-users');
+  const containerMax = isAdminRoute ? 'max-w-6xl' : 'max-w-2xl';
   const isAdminUsers = typeof window !== 'undefined' && window.location.hash === '#/admin-users';
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50 text-gray-800 font-sans">
-        <div className="w-full max-w-2xl mx-auto">
+    <div className="min-h-screen flex flex-col items-center justify-start p-4 bg-gray-50 text-gray-800 font-sans">
+        <div className={`w-full ${containerMax} mx-auto`}>
             <header className="flex justify-center items-center mb-8">
                 <FedExLogo />
             </header>
-            <main className="bg-white p-6 sm:p-10 rounded-2xl shadow-lg transition-all duration-500">
+            <main className="bg-white p-4 sm:p-8 rounded-2xl shadow-lg transition-all duration-500">
                 {isAdminRoute ? (
                   isAdminUsers ? <AdminUsers /> : <AdminDashboard />
                 ) : (
