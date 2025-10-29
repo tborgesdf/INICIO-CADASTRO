@@ -7,6 +7,7 @@ import CompletionScreen from './components/CompletionScreen';
 import VisaTypeScreen from './components/VisaTypeScreen';
 import Chatbot from './components/Chatbot';
 import LoginScreen from './components/LoginScreen';
+import AdminDashboard from './components/AdminDashboard';
 
 const FedExLogo: React.FC = () => (
     <svg className="h-16 w-auto" viewBox="0 0 380 100" xmlns="http://www.w3.org/2000/svg">
@@ -61,6 +62,8 @@ function App() {
     }
   };
 
+  const isAdminRoute = typeof window !== 'undefined' && window.location.hash === '#/admin';
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50 text-gray-800 font-sans">
         <div className="w-full max-w-2xl mx-auto">
@@ -68,7 +71,11 @@ function App() {
                 <FedExLogo />
             </header>
             <main className="bg-white p-6 sm:p-10 rounded-2xl shadow-lg transition-all duration-500">
-                {isAuthenticated ? renderStep() : <LoginScreen onLoginSuccess={handleLoginSuccess} />}
+                {isAdminRoute ? (
+                  <AdminDashboard />
+                ) : (
+                  isAuthenticated ? renderStep() : <LoginScreen onLoginSuccess={handleLoginSuccess} />
+                )}
             </main>
         </div>
         {isAuthenticated && <Chatbot />}
