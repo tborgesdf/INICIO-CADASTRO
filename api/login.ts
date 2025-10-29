@@ -26,6 +26,7 @@ function blindIndex(value: string) {
   const key = Buffer.from(v, 'base64');
   return crypto.createHmac('sha256', key).update(value, 'utf8').digest('hex');
 }
+function normalizeCpf(input: string): string { return String(input||'').replace(/\D+/g,''); }
 function setAuthCookie(res: any, token: string) {
   const isProd = process.env.NODE_ENV === 'production';
   const cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${2*24*60*60}; ${isProd ? 'Secure' : ''}`;
@@ -73,7 +74,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const [r] = await conn.execute(`SELECT id, password_hash FROM auth_accounts WHERE email = ? AND provider = 'email' LIMIT 1`, [String(email)]);
         rows = r as any[];
       } else {
-        const cpfBidx = blindIndex(String(cpf));
+        const cpfNorm = normalizeCpf(String(cpf));
+        if (cpfNorm.length !== 11) return res.status(401).json({ error: 'Invalid credentials' });
+        const cpfBidx = blindIndex(cpfNorm);
         const [r] = await conn.execute(`
           SELECT aa.id, aa.password_hash
           FROM auth_accounts aa

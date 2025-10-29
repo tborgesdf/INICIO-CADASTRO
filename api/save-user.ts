@@ -74,7 +74,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { cpf, phone, email, socialMedia, location, visaType, countries } = body;
 
-    if (!cpf || !phone || !email || !visaType || !Array.isArray(countries) || countries.length === 0) {
+    // Normalize and validate CPF
+    const cpfNorm = String(cpf || '').replace(/\D+/g, '');
+    const invalidCpf = ((): boolean => {
+      if (cpfNorm.length !== 11) return true;
+      if (/^(\d)\1{10}$/.test(cpfNorm)) return true;
+      const dv = (base: string) => { let f = base.length + 1, sum = 0; for (let i=0;i<base.length;i++) sum += parseInt(base[i],10) * (f - i); const mod=sum%11; return mod<2?0:11-mod; };
+      return dv(cpfNorm.substring(0,9)) !== parseInt(cpfNorm[9],10) || dv(cpfNorm.substring(0,10)) !== parseInt(cpfNorm[10],10);
+    })();
+
+    if (!cpf || invalidCpf || !phone || !email || !visaType || !Array.isArray(countries) || countries.length === 0) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -96,10 +105,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const session = dec && dec.accountId ? { accountId: Number(dec.accountId), email: String(dec.email || '') } : null;
       const accountId = session?.accountId || null;
 
-      const encCpf = cpf ? encrypt(String(cpf)) : null;
+      const encCpf = cpf ? encrypt(cpfNorm) : null;
       const encPhone = phone ? encrypt(String(phone)) : null;
       const encEmail = email ? encrypt(String(email)) : null;
-      const cpfBidx = cpf ? blindIndex(String(cpf)) : null;
+      const cpfBidx = cpf ? blindIndex(cpfNorm) : null;
       const emailBidx = email ? blindIndex(String(email)) : null;
 
       const [userResult] = await conn.execute<import('mysql2').ResultSetHeader>(
