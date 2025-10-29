@@ -301,21 +301,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ORDER BY last_at DESC
             LIMIT 30`
         );
-        return res.status(200).json({ ok: true, totalUsers, byVisaType, byDay, topCountries, geo, ca, eua, mx, recentCities });
+        const [recentAccess]: any = await conn.query(
+          `SELECT city, country, created_at AS last_at,
+                  JSON_UNQUOTE(JSON_EXTRACT(extra,'$.isp')) AS isp,
+                  JSON_UNQUOTE(JSON_EXTRACT(extra,'$.isProxy')) AS isProxy,
+                  JSON_UNQUOTE(JSON_EXTRACT(extra,'$.isTor')) AS isTor
+             FROM access_logs
+            WHERE city IS NOT NULL AND city <> ''
+            ORDER BY created_at DESC
+            LIMIT 30`
+        );
+        return res.status(200).json({ ok: true, totalUsers, byVisaType, byDay, topCountries, geo, ca, eua, mx, recentCities, recentAccess });
       }
 
       if (action === 'user') {
         const id = Number(req.query.id || 0);
         if (!id) return res.status(400).json({ error: 'Missing id' });
         const [uRows]: any = await conn.query(
-          `SELECT u.*, aa.name FROM users u LEFT JOIN auth_accounts aa ON aa.id = u.account_id WHERE u.id = ? LIMIT 1`,
+          `SELECT u.*, aa.name, aa.email AS account_email FROM users u LEFT JOIN auth_accounts aa ON aa.id = u.account_id WHERE u.id = ? LIMIT 1`,
           [id]
         );
         const user = (uRows || [])[0];
         if (!user) return res.status(404).json({ error: 'Not found' });
         const [social]: any = await conn.query(`SELECT platform, handle FROM user_social_media WHERE user_id = ? ORDER BY id ASC`, [id]);
         const [countries]: any = await conn.query(`SELECT country FROM user_countries WHERE user_id = ? ORDER BY id ASC`, [id]);
-        return res.status(200).json({ ok: true, user, social, countries });
+        // login logs por conta
+        let loginLogs: any[] = [];
+        try {
+          if (user.account_email) {
+            const [logs]: any = await conn.query(
+              `SELECT created_at, ip, user_agent, country, region, city,
+                      JSON_UNQUOTE(JSON_EXTRACT(extra,'$.browser')) AS browser,
+                      JSON_UNQUOTE(JSON_EXTRACT(extra,'$.os')) AS os,
+                      JSON_UNQUOTE(JSON_EXTRACT(extra,'$.connType')) AS connType,
+                      JSON_UNQUOTE(JSON_EXTRACT(extra,'$.isp')) AS isp
+                 FROM access_logs
+                WHERE action='login' AND account_email=?
+                ORDER BY created_at DESC
+                LIMIT 50`, [user.account_email]
+            );
+            loginLogs = logs || [];
+          }
+        } catch {}
+        return res.status(200).json({ ok: true, user, social, countries, loginLogs });
       }
 
       if (action === 'purge' && req.method === 'POST') {

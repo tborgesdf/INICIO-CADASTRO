@@ -7,6 +7,7 @@ const LocationGate: React.FC<Props> = ({ onNext }) => {
   const [error, setError] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
   const [showModal, setShowModal] = useState(true);
+  const [advanced, setAdvanced] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -62,7 +63,10 @@ const LocationGate: React.FC<Props> = ({ onNext }) => {
             clientLat: pos.coords.latitude, clientLng: pos.coords.longitude,
           } as any;
           fetch('/api/client-log', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(body) }).catch(()=>{});
+          // também salvar rascunho de localização para o processo do usuário
+          try { fetch('/api/save-draft', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ location: { latitude: body.clientLat, longitude: body.clientLng } }) }); } catch {}
         } catch {}
+        if (!advanced) { setAdvanced(true); onNext(); }
       },
       (err) => {
         setGranted(false);
@@ -72,6 +76,14 @@ const LocationGate: React.FC<Props> = ({ onNext }) => {
       { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
     );
   };
+
+  // Se a permissão já estiver concedida (ou assim que for), avançar automaticamente
+  React.useEffect(() => {
+    if (granted === true && !advanced) {
+      setAdvanced(true);
+      onNext();
+    }
+  }, [granted]);
 
   return (
     <div className="flex flex-col animate-fade-in">

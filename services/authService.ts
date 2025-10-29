@@ -1,10 +1,20 @@
 ﻿// Serviço de autenticação (e-mail/CPF + senha)
 class AuthService {
   public async login(identifier: { email?: string; cpf?: string }, password: string): Promise<void> {
+    // coletar meta de dispositivo/rede no cliente
+    const ua = navigator.userAgent || '';
+    const nav: any = navigator as any;
+    const conn = nav.connection || nav.mozConnection || nav.webkitConnection;
+    const connType = conn?.effectiveType || conn?.type || '';
+    const downlink = conn?.downlink || undefined;
+    const rtt = conn?.rtt || undefined;
+    const getBrowser = () => { if (/Chrome\//.test(ua) && !/Edg\//.test(ua)) return 'Chrome'; if (/Edg\//.test(ua)) return 'Edge'; if (/Safari\//.test(ua) && /Version\//.test(ua)) return 'Safari'; if (/Firefox\//.test(ua)) return 'Firefox'; return 'Outro'; };
+    const getOS = () => { if (/Windows NT/.test(ua)) return 'Windows'; if (/Mac OS X/.test(ua)) return 'macOS'; if (/Android/.test(ua)) return 'Android'; if (/iPhone|iPad|iPod/.test(ua)) return 'iOS'; return 'Outro'; };
+    const meta = { browser: getBrowser(), os: getOS(), ua, connType, downlink, rtt };
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...identifier, password }),
+      body: JSON.stringify({ ...identifier, password, meta }),
     });
     if (!res.ok) {
       let msg = 'Falha no login';

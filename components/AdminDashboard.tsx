@@ -322,9 +322,12 @@ const AdminDashboard: React.FC = () => {
               {(detail.loginLogs||[]).length ? (
                 <ul className="divide-y text-xs">
                   {detail.loginLogs.map((l:any, i:number)=> (
-                    <li key={i} className="py-1 flex items-center justify-between">
-                      <span>{l.city||'-'}{l.country?`, ${l.country}`:''}</span>
-                      <span className="text-gray-500">{fmtBR(l.created_at)}</span>
+                    <li key={i} className="py-1">
+                      <div className="flex items-center justify-between">
+                        <span>{l.city||'-'}{l.country?`, ${l.country}`:''}</span>
+                        <span className="text-gray-500">{fmtBR(l.created_at)}</span>
+                      </div>
+                      <div className="text-gray-600">{l.browser||'-'} • {l.os||'-'} • {l.connType||'-'} • ISP: {l.isp||'-'}</div>
                     </li>
                   ))}
                 </ul>

@@ -61,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch {
       return res.status(400).json({ error: 'Invalid JSON' });
     }
-    const { email, cpf, password } = body;
+    const { email, cpf, password, meta } = body;
     if ((!email && !cpf) || !password) return res.status(400).json({ error: 'Missing identifier/password' });
 
     const { DB_HOST, DB_USER, DB_PASSWORD, DB_NAME } = process.env as Record<string, string | undefined>;
@@ -134,7 +134,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             extra TEXT NULL,
             PRIMARY KEY (id)
           ) ENGINE=InnoDB`);
-        const extra = JSON.stringify({ isp, asn });
+        const extra = JSON.stringify({
+          isp, asn,
+          browser: meta?.browser || '',
+          os: meta?.os || '',
+          ua: meta?.ua || (h['user-agent'] as string) || '',
+          connType: meta?.connType || '',
+          downlink: meta?.downlink ?? null,
+          rtt: meta?.rtt ?? null,
+        });
         await conn.query(
           `INSERT INTO access_logs (action, ip, port, method, path, user_agent, referer, country, region, city, latitude, longitude, accept_language, x_forwarded_for, account_email, extra)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
