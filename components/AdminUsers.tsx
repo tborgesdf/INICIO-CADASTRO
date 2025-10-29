@@ -67,6 +67,20 @@ const AdminUsers: React.FC = () => {
       const base64 = String(reader.result||''); setForm(prev=>({ ...prev, photo: base64 }));
     }; reader.readAsDataURL(f);
   };
+  // opções de campos aplicáveis às permissões
+  const fieldOpts = ['name','email','cpf','birth_date','phone','visa_type','countries'];
+  const hasField = (list: string, key: string) => list.split(',').map(s=>s.trim()).filter(Boolean).includes(key);
+  const toggleField = (which: 'view'|'edit', key: string, on?: boolean) => {
+    const current = (which==='view'? form.view_fields : form.edit_fields).split(',').map(s=>s.trim()).filter(Boolean);
+    const set = new Set(current);
+    if (on===undefined) {
+      if (set.has(key)) set.delete(key); else set.add(key);
+    } else {
+      if (on) set.add(key); else set.delete(key);
+    }
+    const str = Array.from(set).join(',');
+    setForm(prev => ({ ...prev, [which==='view'?'view_fields':'edit_fields']: str } as any));
+  };
   const save = async () => {
     setErr('');
     try {
@@ -132,8 +146,28 @@ const AdminUsers: React.FC = () => {
               <label className="block"><input type="checkbox" checked={form.can_manage_users} onChange={e=>setForm({...form,can_manage_users:e.target.checked})} /> Gerenciar usuários</label>
               <label className="block"><input type="checkbox" checked={form.can_view_all} onChange={e=>setForm({...form,can_view_all:e.target.checked})} /> Ver todos os dados</label>
               <label className="block"><input type="checkbox" checked={form.can_edit_all} onChange={e=>setForm({...form,can_edit_all:e.target.checked})} /> Editar todos os dados</label>
-              <label className="block md:col-span-2">Campos visíveis (vírgulas) <input value={form.view_fields} onChange={e=>setForm({...form,view_fields:e.target.value})} className="w-full border rounded px-2 py-1" placeholder="email,cpf,phone" /></label>
-              <label className="block md:col-span-2">Campos editáveis (vírgulas) <input value={form.edit_fields} onChange={e=>setForm({...form,edit_fields:e.target.value})} className="w-full border rounded px-2 py-1" placeholder="email,cpf,phone" /></label>
+              <div className="md:col-span-2">
+                <div className="mb-1 font-medium">Campos visíveis</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {fieldOpts.map(f => (
+                    <label key={f} className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={hasField(form.view_fields, f)} onChange={e=>toggleField('view', f, e.target.checked)} /> {f}
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-2 text-xs text-gray-500">Selecione quais campos o usuário pode visualizar.</div>
+              </div>
+              <div className="md:col-span-2">
+                <div className="mb-1 font-medium">Campos editáveis</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {fieldOpts.map(f => (
+                    <label key={f} className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={hasField(form.edit_fields, f)} onChange={e=>toggleField('edit', f, e.target.checked)} /> {f}
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-2 text-xs text-gray-500">Selecione quais campos o usuário pode editar.</div>
+              </div>
               <label className="block"><input type="checkbox" checked={form.is_active} onChange={e=>setForm({...form,is_active:e.target.checked})} /> Ativo</label>
             </div>
             {err && <p className="text-sm text-red-600 mt-2">{err}</p>}
@@ -149,4 +183,3 @@ const AdminUsers: React.FC = () => {
 };
 
 export default AdminUsers;
-
