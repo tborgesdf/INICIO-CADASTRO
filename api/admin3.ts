@@ -131,3 +131,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Internal error', message: e?.message || String(e) });
   }
 }
+
