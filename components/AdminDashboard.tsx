@@ -15,7 +15,8 @@ type Row = {
 
 const AdminDashboard: React.FC = () => {
   const [authed, setAuthed] = React.useState<boolean | null>(null);
-  const [token, setToken] = React.useState('');
+  const [admEmail, setAdmEmail] = React.useState('');
+  const [admPassword, setAdmPassword] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
 
@@ -36,9 +37,9 @@ const AdminDashboard: React.FC = () => {
   const login = async (e: React.FormEvent) => {
     e.preventDefault(); setError(''); setLoading(true);
     try {
-      const r = await fetch('/api/admin?action=login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
+      const r = await fetch('/api/admin?action=admin-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: admEmail, password: admPassword }) });
       if (!r.ok) { const j = await r.json().catch(()=>({})); throw new Error(j?.error || 'Falha ao autenticar'); }
-      setToken(''); await check();
+      setAdmEmail(''); setAdmPassword(''); await check();
     } catch (err:any) { setError(err?.message || 'Erro'); } finally { setLoading(false); }
   };
 
@@ -83,9 +84,10 @@ const AdminDashboard: React.FC = () => {
     <div>
       <h2 className="text-xl font-semibold mb-2">Acesso Administrativo</h2>
       <form onSubmit={login} className="space-y-3">
-        <input type="password" value={token} onChange={e=>setToken(e.target.value)} className="w-full border rounded px-3 py-2" placeholder="Token de administrador" />
+        <input type="email" value={admEmail} onChange={e=>setAdmEmail(e.target.value)} className="w-full border rounded px-3 py-2" placeholder="E-mail administrador" />
+        <input type="password" value={admPassword} onChange={e=>setAdmPassword(e.target.value)} className="w-full border rounded px-3 py-2" placeholder="Senha" />
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <button type="submit" disabled={loading || !token} className="px-4 py-2 bg-purple-600 text-white rounded disabled:bg-gray-300">{loading? 'Entrando...' : 'Entrar'}</button>
+        <button type="submit" disabled={loading || !admEmail || !admPassword} className="px-4 py-2 bg-purple-600 text-white rounded disabled:bg-gray-300">{loading? 'Entrando...' : 'Entrar'}</button>
       </form>
     </div>
   );

@@ -1,5 +1,5 @@
 import * as crypto from 'crypto';
-import { verifyFromRequest } from './auth';
+// Removido fallback por sessão de usuário para exigir login admin dedicado.
 
 const ADMIN_COOKIE = 'admin_session';
 
@@ -39,13 +39,6 @@ export function isAdmin(req: any): boolean {
       .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
     if (sig !== s) return false;
     const obj = JSON.parse(payload);
-    if (obj && obj.adm) return true;
-    // Fallback: permitir admin por e-mail na sessão de usuário comum (allowlist)
-    const allow = String(process.env.ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
-    if (allow.length) {
-      const sess = verifyFromRequest(req);
-      if (sess && allow.includes(String(sess.email || '').toLowerCase())) return true;
-    }
-    return false;
+    return !!(obj && obj.adm);
   } catch { return false; }
 }
