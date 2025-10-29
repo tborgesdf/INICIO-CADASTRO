@@ -11,6 +11,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [formData, setFormData] = useState({ name: '', email: '', cpf: '', password: '', confirmPassword: '' });
   const [errors, setErrors] = useState({ name: '', email: '', cpf: '', password: '', confirmPassword: '', api: '' });
   const [isLoading, setIsLoading] = useState(false);
+  const [availability, setAvailability] = useState<{ emailAvailable: boolean | null; cpfAvailable: boolean | null; checking: boolean }>({ emailAvailable: null, cpfAvailable: null, checking: false });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -31,12 +32,41 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       if (formData.name.trim() === '') { newErrors.name = 'O nome é obrigatório.'; isValid = false; }
       if (!validateEmail(formData.email)) { newErrors.email = 'Por favor, insira um e-mail válido.'; isValid = false; }
       if (!validateCPF(formData.cpf)) { newErrors.cpf = 'CPF inválido.'; isValid = false; }
+      // Bloqueia cadastro se já existir
+      if (availability.emailAvailable === false) { newErrors.email = 'E-mail já cadastrado.'; isValid = false; }
+      if (availability.cpfAvailable === false) { newErrors.cpf = 'CPF já cadastrado.'; isValid = false; }
     }
     if (formData.password.length < 6) { newErrors.password = 'A senha deve ter pelo menos 6 caracteres.'; isValid = false; }
     if (!isLoginView && formData.password !== formData.confirmPassword) { newErrors.confirmPassword = 'As senhas não coincidem.'; isValid = false; }
     setErrors(newErrors);
     return isValid;
   };
+
+  // Debounce de disponibilidade (apenas no cadastro)
+  React.useEffect(() => {
+    if (isLoginView) return; // só cadastrar
+    let cancel = false;
+    const run = async () => {
+      const wantsEmail = validateEmail(formData.email);
+      const wantsCpf = validateCPF(formData.cpf);
+      if (!wantsEmail && !wantsCpf) {
+        setAvailability(a => ({ ...a, emailAvailable: wantsEmail ? a.emailAvailable : null, cpfAvailable: wantsCpf ? a.cpfAvailable : null, checking: false }));
+        return;
+      }
+      setAvailability(a => ({ ...a, checking: true }));
+      try {
+        const params: any = {};
+        if (wantsEmail) params.email = formData.email;
+        if (wantsCpf) params.cpf = formData.cpf;
+        const r = await authService.checkAvailability(params);
+        if (!cancel) setAvailability({ emailAvailable: wantsEmail ? r.emailAvailable : null, cpfAvailable: wantsCpf ? r.cpfAvailable : null, checking: false });
+      } catch {
+        if (!cancel) setAvailability(a => ({ ...a, checking: false }));
+      }
+    };
+    const t = setTimeout(run, 450);
+    return () => { cancel = true; clearTimeout(t); };
+  }, [isLoginView, formData.email, formData.cpf]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,7 +122,19 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         ) : (
           <>
             <InputField icon={<Mail />} name="email" type="email" placeholder="E-mail" value={formData.email} onChange={handleInputChange} error={errors.email} />
+            {/* Indicador de disponibilidade do e-mail */}
+            {validateEmail(formData.email) && availability.emailAvailable !== null && (
+              <p className={`text-xs ${availability.emailAvailable ? 'text-green-600' : 'text-red-600'}`}>
+                {availability.emailAvailable ? 'E-mail disponível' : 'E-mail já cadastrado'}
+              </p>
+            )}
             <InputField icon={<User />} name="cpf" type="text" placeholder="CPF" value={formData.cpf} onChange={handleInputChange} error={errors.cpf} />
+            {/* Indicador de disponibilidade do CPF */}
+            {validateCPF(formData.cpf) && availability.cpfAvailable !== null && (
+              <p className={`text-xs ${availability.cpfAvailable ? 'text-green-600' : 'text-red-600'}`}>
+                {availability.cpfAvailable ? 'CPF disponível' : 'CPF já cadastrado'}
+              </p>
+            )}
           </>
         )}
 
@@ -102,7 +144,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         )}
 
         {errors.api && <p className="text-sm text-red-600">{errors.api}</p>}
-        <button type="submit" disabled={isLoading} className="w-full mt-2 py-3 px-4 text-lg font-semibold text-white bg-orange-500 rounded-lg shadow-md hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center transition-all duration-300">
+        <button type="submit" disabled={isLoading || (!isLoginView && availability.checking)} className="w-full mt-2 py-3 px-4 text-lg font-semibold text-white bg-orange-500 rounded-lg shadow-md hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center transition-all duration-300">
           {isLoading ? <Loader2 className="animate-spin h-6 w-6" /> : (isLoginView ? 'Entrar' : 'Criar Conta')}
         </button>
         {isLoginView && <a href="#" className="block text-center text-sm text-purple-700 hover:underline mt-2">Esqueceu sua senha?</a>}
@@ -122,4 +164,3 @@ const InputField: React.FC<{ icon: React.ReactNode; name: string; type: string; 
 );
 
 export default LoginScreen;
-
