@@ -15,3 +15,6 @@ PS C:\Users\Thiago Borges>
 (Invoke-WebRequest -Uri "https://inicio-cadastro.vercel.app/api/diag-sec" -Headers @{ 'x-admin-token' = '9LPuVOd8mfxdERf+X3130Cp2V1ScJF0dGbpxjN5y2Uw=' } -TimeoutSec 60).Content
 
 $admin = '9LPuVOd8mfxdERf+X3130Cp2V1ScJF0dGbpxjN5y2Uw=' # ou: $admin = $env:ADMIN_TOKEN
+
+
+

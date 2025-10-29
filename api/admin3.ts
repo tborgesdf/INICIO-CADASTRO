@@ -1,7 +1,39 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import * as crypto from 'crypto';
 import mysql from 'mysql2/promise';
-import { isAdmin, setAdminCookie, clearAdminCookie } from '../lib/adminAuth2';
+// Helpers inline para autenticação admin (evita problemas de resolução de módulo no runtime ESM)
+const ADMIN_COOKIE = 'admin_session';
+const b64url = (b: Buffer | string) => (typeof b === 'string' ? Buffer.from(b) : b)
+  .toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+function setAdminCookie(res: any) {
+  const secret = process.env.JWT_SECRET || 'change-me-dev';
+  const now = Math.floor(Date.now()/1000);
+  const payload = JSON.stringify({ adm: true, iat: now });
+  const sig = crypto.createHmac('sha256', secret).update(payload).digest('base64')
+    .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  const val = `${b64url(payload)}.${sig}`;
+  const isProd = process.env.NODE_ENV === 'production';
+  res.setHeader('Set-Cookie', `${ADMIN_COOKIE}=${encodeURIComponent(val)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${2*60*60}; ${isProd?'Secure':''}`);
+}
+function clearAdminCookie(res: any) {
+  res.setHeader('Set-Cookie', `${ADMIN_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`);
+}
+function isAdmin(req: any): boolean {
+  try {
+    const cookie: string = req.headers?.cookie || '';
+    const part = cookie.split(';').map((s:string)=>s.trim()).find((s:string)=>s.startsWith(`${ADMIN_COOKIE}=`));
+    if (!part) return false;
+    const val = decodeURIComponent(part.split('=')[1]||'');
+    const [p,s] = val.split('.'); if (!(p && s)) return false;
+    const payload = Buffer.from(p.replace(/-/g,'+').replace(/_/g,'/'),'base64').toString('utf8');
+    const secret = process.env.JWT_SECRET || 'change-me-dev';
+    const sig = crypto.createHmac('sha256', secret).update(payload).digest('base64')
+      .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    if (sig !== s) return false;
+    const obj = JSON.parse(payload);
+    return !!(obj && obj.adm);
+  } catch { return false; }
+}
 
 export const config = { runtime: 'nodejs' };
 
