@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { UserData } from './types';
-import WelcomeScreen from './components/WelcomeScreen';
+// import WelcomeScreen from './components/WelcomeScreen';
+import LocationGate from './components/LocationGate';
 import PersonalInfoScreen from './components/PersonalInfoScreen';
 import SocialMediaScreen from './components/SocialMediaScreen';
 import CompletionScreen from './components/CompletionScreen';
@@ -49,7 +50,7 @@ function App() {
   const renderStep = () => {
     switch (step) {
       case 1:
-        return <WelcomeScreen onNext={nextStep} />;
+        return <LocationGate onNext={nextStep} />;
       case 2:
         return <PersonalInfoScreen onNext={nextStep} userData={userData} setUserData={setUserData} />;
       case 3:
@@ -59,7 +60,7 @@ function App() {
       case 5:
         return <CompletionScreen userData={userData} />;
       default:
-        return <WelcomeScreen onNext={nextStep} />;
+        return <LocationGate onNext={nextStep} />;
     }
   };
 

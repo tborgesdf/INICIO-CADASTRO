@@ -280,7 +280,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const [geo] = await conn.query<any[]>(
           `SELECT ROUND(u.latitude, 2) AS lat, ROUND(u.longitude, 2) AS lng, COUNT(*) AS count FROM users u ${geoWhere} GROUP BY ROUND(u.latitude,2), ROUND(u.longitude,2) ORDER BY count DESC LIMIT 1000`, params
         );
-        return res.status(200).json({ ok: true, totalUsers, byVisaType, byDay, topCountries, geo });
+        // Aggregate simple country counts for CA / EUA / MX using basic normalization
+        const [aggCountries]: any = await conn.query(
+          `SELECT
+             SUM(CASE WHEN UPPER(uc.country) LIKE 'CANAD%' OR UPPER(uc.country)='CA' THEN 1 ELSE 0 END) AS CA,
+             SUM(CASE WHEN UPPER(uc.country) IN ('ESTADOS UNIDOS','UNITED STATES','EUA','USA','US') OR UPPER(uc.country) LIKE 'ESTADOS UNID%' THEN 1 ELSE 0 END) AS EUA,
+             SUM(CASE WHEN UPPER(uc.country) LIKE 'MEX%' OR UPPER(uc.country)='MX' THEN 1 ELSE 0 END) AS MX
+           FROM user_countries uc JOIN users u ON u.id = uc.user_id ${whereSql}`, params
+        );
+        const ca = Number((aggCountries || [])[0]?.CA || 0);
+        const eua = Number((aggCountries || [])[0]?.EUA || 0);
+        const mx = Number((aggCountries || [])[0]?.MX || 0);
+
+        // Recent cities from access_logs (last seen and count)
+        const [recentCities]: any = await conn.query(
+          `SELECT city, country, MAX(created_at) AS last_at, COUNT(*) AS count
+             FROM access_logs
+            WHERE city IS NOT NULL AND city <> ''
+            GROUP BY city, country
+            ORDER BY last_at DESC
+            LIMIT 30`
+        );
+        return res.status(200).json({ ok: true, totalUsers, byVisaType, byDay, topCountries, geo, ca, eua, mx, recentCities });
       }
 
       if (action === 'user') {

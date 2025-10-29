@@ -35,6 +35,7 @@
     "node_modules",
     "ARQUIVOS/**",
     "EXEMPLOS/**",
-    "api/admin.ts"
+    "api/admin.ts",
+    "components/WelcomeScreen.tsx"
   ]
 }

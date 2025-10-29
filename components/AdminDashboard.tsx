@@ -29,6 +29,7 @@ const AdminDashboard: React.FC = () => {
 
   const [detail, setDetail] = React.useState<any | null>(null);
   const [metrics, setMetrics] = React.useState<any | null>(null);
+  const [chartKind, setChartKind] = React.useState<'day'|'visa'>('day');
   const [purging, setPurging] = React.useState(false);
   const [edit, setEdit] = React.useState<any | null>(null);
   const [perms, setPerms] = React.useState<{ isSuper:boolean; can_manage_users:boolean; can_view_all:boolean; can_edit_all:boolean; view_fields:string[]; edit_fields:string[] }>({ isSuper:false, can_manage_users:false, can_view_all:true, can_edit_all:false, view_fields:[], edit_fields:[] });
@@ -87,6 +88,12 @@ const AdminDashboard: React.FC = () => {
     setMetrics(j);
   };
   React.useEffect(() => { if (authed) { loadMetrics().catch(()=>{}); } }, [authed]);
+  // auto refresh metrics every 30 minutes
+  React.useEffect(() => {
+    if (!authed) return;
+    const t = setInterval(() => { loadMetrics().catch(()=>{}); }, 30*60*1000);
+    return () => clearInterval(t);
+  }, [authed]);
   React.useEffect(() => { if (authed) { (async()=>{ try{ const r=await fetch('/api/admin3?action=whoami'); const j=await r.json(); if(r.ok && j.ok && j.perms){ setPerms(j.perms); } }catch{} })(); } }, [authed]);
   const refreshAll = async () => { await Promise.all([load(), loadMetrics()]); };
 
@@ -156,22 +163,8 @@ const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Séries por dia (30 dias) */}
-      {metrics && (
-        <div className="mb-4 p-3 border rounded bg-white">
-          <div className="text-sm font-semibold mb-2">Cadastros por dia (últimos 30 dias)</div>
-          <ChartBars data={(metrics.byDay||[])} width={600} height={140} />
-        </div>
-      )}
-
-      {/* Heatmap simples (lat/lng) */}
-      {metrics && (
-        <div className="mb-4 p-3 border rounded bg-white">
-          <div className="text-sm font-semibold mb-2">Mapa de calor (distribuição geográfica)</div>
-          <HeatmapWorld points={(metrics.geo||[])} width={600} height={300} />
-          <p className="text-xs text-gray-500 mt-1">Representação simplificada (sem tiles); a intensidade reflete clusters aproximados.</p>
-        </div>
-      )}
+      {/* moved sections below */}{/* Heatmap simples (lat/lng) */}
+      {/* moved heatmap below */}
 
       <form onSubmit={onFilterSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
         <input value={filters.email} onChange={e=>setFilters({...filters, email:e.target.value})} className="border rounded px-2 py-1" placeholder="E-mail" />
@@ -245,8 +238,50 @@ const AdminDashboard: React.FC = () => {
           }} className="px-3 py-1 border rounded text-red-700 disabled:opacity-50">Apagar selecionados</button>
         </div>
         <span className="text-sm">Página {page} de {pages}</span>
-        <button disabled={page>=pages} onClick={()=>setPage(p=>p+1)} className="px-3 py-1 border rounded disabled:opacity-50">Próxima</button>
+        <button disabled={page>=pages} onClick={()=>setPage(p=>p+1)} className="px-3 py-1 border rounded disabled:opacity-50">Proxima</button>
       </div>
+
+      {metrics && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4 mt-4">
+          <div className="p-3 border rounded bg-white">
+            <div className="text-sm font-semibold mb-2">Mapa de calor (distribuicao geografica)</div>
+            <HeatmapWorld points={(metrics.geo||[])} width={600} height={300} />
+            <p className="text-xs text-gray-500 mt-1">Representacao simplificada; a intensidade reflete clusters aproximados.</p>
+          </div>
+          <div className="p-3 border rounded bg-white">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-semibold">Ultimas cidades que acessaram</div>
+              <button onClick={()=>loadMetrics()} className="text-xs text-purple-700 underline">Atualizar</button>
+            </div>
+            <ul className="divide-y max-h-[300px] overflow-auto text-sm">
+              {(metrics.recentCities||[]).map((c:any, i:number)=> (
+                <li key={i} className="py-1 flex items-center justify-between">
+                  <span>{c.city || '-'}{c.country? `, ${c.country}`:''}</span>
+                  <span className="text-gray-500">{fmtBR(c.last_at)}</span>
+                </li>
+              ))}
+              {(!metrics.recentCities || metrics.recentCities.length===0) && <li className="py-2 text-gray-500">Sem dados</li>}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {metrics && (
+        <div className="mb-4 p-3 border rounded bg-white">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm font-semibold">Metricas</div>
+            <div className="flex items-center gap-2">
+              <button onClick={()=>setChartKind('day')} className={`px-2 py-1 border rounded text-xs ${chartKind==='day'?'bg-purple-600 text-white':'bg-white'}`}>Por dia (30)</button>
+              <button onClick={()=>setChartKind('visa')} className={`px-2 py-1 border rounded text-xs ${chartKind==='visa'?'bg-purple-600 text-white':'bg-white'}`}>Por visto</button>
+            </div>
+          </div>
+          {chartKind==='day' ? (
+            <ChartBars data={(metrics.byDay||[])} width={600} height={140} />
+          ) : (
+            <ChartBars data={(metrics.byVisaType||[]).map((v:any)=>({ day: String(v.visaType||'-'), count: Number(v.count||0) }))} width={600} height={140} />
+          )}
+        </div>
+      )}
 
       {detail && (
         <div className="fixed inset-0 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={()=>setDetail(null)}>
